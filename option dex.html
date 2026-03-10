@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão Strada — Sistema de Lançamento de Custos</title>
+    <meta name="description"
+        content="Sistema empresarial de lançamento e gerenciamento de custos — Strada BikeShop & Bike Café">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- ============ AUTH LOGIN SCREEN ============ -->
+    <div class="login-screen" id="authScreen">
+        <div class="login-bg"></div>
+        <div class="login-container">
+            <img src="logo.jpg" alt="Strada" class="login-logo" id="loginLogo">
+            <h1 class="login-title">Gestão Strada</h1>
+            <p class="login-subtitle">Faça login para continuar</p>
+            <form id="authForm" class="auth-form" autocomplete="off">
+                <div class="auth-field">
+                    <div class="auth-input-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                    </div>
+                    <input type="text" id="authUser" placeholder="Usuário" required autocomplete="username">
+                </div>
+                <div class="auth-field">
+                    <div class="auth-input-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                    </div>
+                    <input type="password" id="authPass" placeholder="Senha" required autocomplete="current-password">
+                    <button type="button" class="auth-toggle-pass" id="togglePass" tabindex="-1">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="eyeIcon">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="auth-error" id="authError"></div>
+                <button type="submit" class="btn-primary auth-submit">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                        <polyline points="10 17 15 12 10 7" />
+                        <line x1="15" y1="12" x2="3" y2="12" />
+                    </svg>
+                    <span>Entrar</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============ UNIT SELECTION SCREEN ============ -->
+    <div class="login-screen" id="unitScreen" style="display:none;">
+        <div class="login-bg"></div>
+        <div class="login-container">
+            <img src="logo.jpg" alt="Strada" class="login-logo">
+            <h1 class="login-title">Gestão Strada</h1>
+            <p class="login-subtitle">Olá, <strong id="unitGreetName"></strong>! Selecione a unidade</p>
+            <div class="login-buttons">
+                <button class="login-btn login-btn-bikeshop" onclick="GestaoStrada.selectUnit('bikeshop')">
+                    <div class="login-btn-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="18.5" cy="17.5" r="3.5" />
+                            <circle cx="5.5" cy="17.5" r="3.5" />
+                            <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
+                        </svg>
+                    </div>
+                    <div class="login-btn-text">
+                        <span class="login-btn-name">Strada BikeShop</span>
+                        <span class="login-btn-desc">Peças, acessórios e serviços</span>
+                    </div>
+                </button>
+                <button class="login-btn login-btn-cafe" onclick="GestaoStrada.selectUnit('bikecafe')">
+                    <div class="login-btn-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+                            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+                            <line x1="6" y1="2" x2="6" y2="4" />
+                            <line x1="10" y1="2" x2="10" y2="4" />
+                            <line x1="14" y1="2" x2="14" y2="4" />
+                        </svg>
+                    </div>
+                    <div class="login-btn-text">
+                        <span class="login-btn-name">Bike Café</span>
+                        <span class="login-btn-desc">Mercearia, bebidas e restaurante</span>
+                    </div>
+                </button>
+            </div>
+            <button class="auth-back-btn" onclick="GestaoStrada.backToLogin()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12" />
+                    <polyline points="12 19 5 12 12 5" />
+                </svg>
+                <span>Sair / Trocar usuário</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ APP LAYOUT ============ -->
+    <div class="app-layout" id="appLayout" style="display:none;">
+
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="logo.jpg" alt="Strada" class="sidebar-logo">
+                <div class="sidebar-brand">
+                    <h2>Gestão Strada</h2>
+                    <span class="sidebar-unit" id="sidebarUnit">Strada BikeShop</span>
+                </div>
+            </div>
+
+            <div class="sidebar-user-info" id="sidebarUserInfo">
+                <div class="sidebar-user-avatar" id="sidebarUserAvatar">U</div>
+                <div class="sidebar-user-details">
+                    <span class="sidebar-user-name" id="sidebarUserName">Usuário</span>
+                    <span class="sidebar-user-role" id="sidebarUserRole">Funcionário</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="sidebar-nav-item active" data-panel="0" id="navDashboard">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7" />
+                        <rect x="14" y="3" width="7" height="7" />
+                        <rect x="14" y="14" width="7" height="7" />
+                        <rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                    <span>Dashboard</span>
+                </button>
+                <button class="sidebar-nav-item" data-panel="1" id="navNewEntry">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    <span>Novo Custo</span>
+                </button>
+                <button class="sidebar-nav-item" data-panel="2" id="navCategories">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                        <line x1="7" y1="7" x2="7.01" y2="7" />
+                    </svg>
+                    <span>Categorias</span>
+                </button>
+                <button class="sidebar-nav-item" data-panel="3" id="navExport">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Exportar</span>
+                </button>
+                <button class="sidebar-nav-item" data-panel="4" id="navPanel">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <span>Painel</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="sidebar-logout" id="btnLogout" onclick="GestaoStrada.logout()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    <span>Sair</span>
+                </button>
+                <span class="sidebar-date" id="currentDate"></span>
+            </div>
+        </aside>
+
+        <!-- MOBILE HEADER -->
+        <header class="mobile-header" id="mobileHeader">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
+            </button>
+            <span class="mobile-title">Gestão Strada</span>
+            <span class="mobile-unit" id="mobileUnit">BikeShop</span>
+        </header>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content" id="mainContent">
+            <div class="panels-wrapper" id="panelsWrapper">
+
+                <!-- Panel 0: Dashboard -->
+                <section class="panel active" id="panelDashboard">
+                    <div class="panel-header">
+                        <h2>Dashboard</h2>
+                        <p class="panel-subtitle">Visão geral dos seus custos</p>
+                    </div>
+                    <div class="panel-content">
+                        <div class="summary-cards">
+                            <div class="summary-card card-total">
+                                <div class="card-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                                    </svg>
+                                </div>
+                                <div class="card-info">
+                                    <span class="card-label">Total Geral</span>
+                                    <span class="card-value" id="totalGeral">R$ 0,00</span>
+                                </div>
+                            </div>
+                            <div class="summary-card card-month">
+                                <div class="card-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg>
+                                </div>
+                                <div class="card-info">
+                                    <span class="card-label">Este Mês</span>
+                                    <span class="card-value" id="totalMes">R$ 0,00</span>
+                                </div>
+                            </div>
+                            <div class="summary-card card-count">
+                                <div class="card-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <line x1="16" y1="13" x2="8" y2="13" />
+                                        <line x1="16" y1="17" x2="8" y2="17" />
+                                    </svg>
+                                </div>
+                                <div class="card-info">
+                                    <span class="card-label">Lançamentos</span>
+                                    <span class="card-value" id="totalLancamentos">0</span>
+                                </div>
+                            </div>
+                            <div class="summary-card card-avg">
+                                <div class="card-icon">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="12" y1="20" x2="12" y2="10" />
+                                        <line x1="18" y1="20" x2="18" y2="4" />
+                                        <line x1="6" y1="20" x2="6" y2="16" />
+                                    </svg>
+                                </div>
+                                <div class="card-info">
+                                    <span class="card-label">Média por Custo</span>
+                                    <span class="card-value" id="mediaCusto">R$ 0,00</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="section-block">
+                            <h3 class="section-title">Distribuição por Categoria</h3>
+                            <div class="category-bars" id="categoryBars">
+                                <div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="16" x2="12" y2="12" />
+                                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                                    </svg>
+                                    <p>Nenhum lançamento ainda</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="section-block">
+                            <h3 class="section-title">Últimos Lançamentos</h3>
+                            <div class="entries-list" id="recentEntries">
+                                <div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.5">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    <p>Adicione seu primeiro custo</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel 1: New Entry -->
+                <section class="panel" id="panelNewEntry">
+                    <div class="panel-header">
+                        <h2>Novo Lançamento</h2>
+                        <p class="panel-subtitle">Registre um novo custo</p>
+                    </div>
+                    <div class="panel-content">
+                        <form id="costForm" class="cost-form" autocomplete="off">
+                            <div class="form-group">
+                                <label for="costDescription">Descrição</label>
+                                <input type="text" id="costDescription" placeholder="Ex: Material de escritório"
+                                    required>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="costValue">Valor (R$)</label>
+                                    <input type="text" id="costValue" placeholder="0,00" required inputmode="decimal">
+                                </div>
+                                <div class="form-group">
+                                    <label for="costDate">Data</label>
+                                    <input type="date" id="costDate" required>
+                                </div>
+                            </div>
+                            <div class="form-group kg-field" id="kgFieldGroup" style="display:none;">
+                                <label for="costKg">Peso (KG) <span class="optional-label">Opcional</span></label>
+                                <input type="text" id="costKg" placeholder="Ex: 1,5" inputmode="decimal">
+                            </div>
+                            <div class="form-group">
+                                <label for="costCategory">Categoria</label>
+                                <select id="costCategory" required>
+                                    <option value="">Selecione uma categoria</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="costCenter">Centro de Custo</label>
+                                <input type="text" id="costCenter" placeholder="Ex: Administrativo">
+                            </div>
+                            <div class="form-group">
+                                <label for="costNotes">Observações</label>
+                                <textarea id="costNotes" placeholder="Notas adicionais (opcional)" rows="3"></textarea>
+                            </div>
+                            <button type="submit" class="btn-primary" id="btnSubmitCost">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                <span>Lançar Custo</span>
+                            </button>
+                        </form>
+                        <div class="section-block" style="margin-top: 2rem;">
+                            <h3 class="section-title">Todos os Lançamentos</h3>
+                            <div class="entries-list" id="allEntries">
+                                <div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.5">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                    </svg>
+                                    <p>Nenhum lançamento registrado</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel 2: Categories -->
+                <section class="panel" id="panelCategories">
+                    <div class="panel-header">
+                        <h2>Categorias</h2>
+                        <p class="panel-subtitle">Gerencie suas categorias de custo</p>
+                    </div>
+                    <div class="panel-content">
+                        <form id="categoryForm" class="cost-form">
+                            <div class="form-row">
+                                <div class="form-group" style="flex:2">
+                                    <label for="catName">Nome da Categoria</label>
+                                    <input type="text" id="catName" placeholder="Ex: Marketing" required>
+                                </div>
+                                <div class="form-group" style="flex:1">
+                                    <label for="catColor">Cor</label>
+                                    <input type="color" id="catColor" value="#6C5CE7" class="color-input">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                <span>Adicionar Categoria</span>
+                            </button>
+                        </form>
+                        <div class="section-block" style="margin-top: 2rem;">
+                            <h3 class="section-title">Categorias Cadastradas</h3>
+                            <div class="categories-grid" id="categoriesGrid"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel 3: Export -->
+                <section class="panel" id="panelExport">
+                    <div class="panel-header">
+                        <h2>Exportar Excel</h2>
+                        <p class="panel-subtitle">Exporte seus dados para planilha</p>
+                    </div>
+                    <div class="panel-content">
+                        <div class="export-filters">
+                            <h3 class="section-title">Filtros de Exportação</h3>
+                            <div class="form-row">
+                                <div class="form-group"><label for="exportDateFrom">Data Início</label><input
+                                        type="date" id="exportDateFrom"></div>
+                                <div class="form-group"><label for="exportDateTo">Data Fim</label><input type="date"
+                                        id="exportDateTo"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="exportCategory">Categoria</label>
+                                <select id="exportCategory">
+                                    <option value="">Todas as categorias</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Colunas a Exportar</label>
+                                <div class="checkbox-group" id="exportColumns">
+                                    <label class="checkbox-label"><input type="checkbox" value="description" checked>
+                                        Descrição</label>
+                                    <label class="checkbox-label"><input type="checkbox" value="value" checked>
+                                        Valor</label>
+                                    <label class="checkbox-label"><input type="checkbox" value="date" checked>
+                                        Data</label>
+                                    <label class="checkbox-label"><input type="checkbox" value="category" checked>
+                                        Categoria</label>
+                                    <label class="checkbox-label"><input type="checkbox" value="center" checked> Centro
+                                        de Custo</label>
+                                    <label class="checkbox-label"><input type="checkbox" value="notes" checked>
+                                        Observações</label>
+                                    <label class="checkbox-label kg-export-col" id="kgExportCol"
+                                        style="display:none;"><input type="checkbox" value="kg" checked> Peso
+                                        (KG)</label>
+                                    <label class="checkbox-label"><input type="checkbox" value="updatedBy" checked>
+                                        Atualizado por</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="section-block" style="margin-top: 1.5rem;">
+                            <div class="preview-header">
+                                <h3 class="section-title">Preview</h3>
+                                <span class="preview-count" id="previewCount">0 registros</span>
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="preview-table" id="previewTable">
+                                    <thead>
+                                        <tr id="previewHead"></tr>
+                                    </thead>
+                                    <tbody id="previewBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="export-actions">
+                            <button class="btn-primary btn-export" id="btnExport">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                <span>Baixar Excel (.xlsx)</span>
+                            </button>
+                            <button class="btn-secondary" id="btnExportCSV">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                    <polyline points="14 2 14 8 20 8" />
+                                </svg>
+                                <span>Baixar CSV</span>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Panel 4: Painel de Funcionários -->
+                <section class="panel" id="panelEmployees">
+                    <div class="panel-header">
+                        <h2>Painel de Funcionários</h2>
+                        <p class="panel-subtitle">Cadastre e gerencie os colaboradores</p>
+                    </div>
+                    <div class="panel-content">
+                        <form id="employeeForm" class="cost-form">
+                            <div class="form-row">
+                                <div class="form-group" style="flex:2">
+                                    <label for="empName">Nome Completo</label>
+                                    <input type="text" id="empName" placeholder="Ex: João Silva" required>
+                                </div>
+                                <div class="form-group" style="flex:1">
+                                    <label for="empRole">Cargo</label>
+                                    <input type="text" id="empRole" placeholder="Ex: Vendedor">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="empUser">Usuário (Login)</label>
+                                    <input type="text" id="empUser" placeholder="Ex: joao.silva" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="empPass">Senha</label>
+                                    <input type="password" id="empPass" placeholder="Senha de acesso" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                                    <circle cx="8.5" cy="7" r="4" />
+                                    <line x1="20" y1="8" x2="20" y2="14" />
+                                    <line x1="23" y1="11" x2="17" y2="11" />
+                                </svg>
+                                <span>Cadastrar Funcionário</span>
+                            </button>
+                        </form>
+
+                        <div class="section-block" style="margin-top: 2rem;">
+                            <h3 class="section-title">Funcionários Cadastrados</h3>
+                            <div class="employees-list" id="employeesList"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"><span class="toast-message" id="toastMessage"></span></div>
+
+    <!-- Delete Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+            </div>
+            <h3>Confirmar Exclusão</h3>
+            <p id="modalText">Deseja realmente excluir este item?</p>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="modalCancel">Cancelar</button>
+                <button class="btn-danger" id="modalConfirm">Excluir</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

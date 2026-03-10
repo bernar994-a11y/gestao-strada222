@@ -1,0 +1,1970 @@
+/* ========================================
+/* ========================================
+   Gestão Strada — Application Logic
+   ======================================== */
+
+(function () {
+    'use strict';
+
+    // ==========================================
+    // Valid Users
+    // ==========================================
+    const VALID_USERS = [
+        { username: 'marcos', password: '1234', name: 'Marcos', role: 'Administrador' },
+        { username: 'nicolas', password: 'admin', name: 'Nicolas', role: 'Administrador' },
+    ];
+
+    let currentUser = null;
+
+    // ==========================================
+    // Supabase Integration
+    // ==========================================
+    const SUPABASE_URL = 'https://xvuspozypouhrjhlgbqv.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_s8RlVo0V54IBl4lHvi9RyA_ZVM6vFr2';
+    let supabase = null;
+
+    try {
+        if (window.supabase && window.supabase.createClient) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log('✅ Supabase conectado');
+        }
+    } catch (e) {
+        console.warn('⚠ Supabase não disponível, usando localStorage', e);
+    }
+
+    async function saveToSupabase() {
+        if (!supabase || !state.currentUnit) return;
+        try {
+            const payload = {
+                unit_id: state.currentUnit,
+                costs: JSON.stringify(state.costs),
+                categories: JSON.stringify(state.categories),
+                contacts: JSON.stringify(state.contacts),
+                campaigns: JSON.stringify(state.campaigns),
+                ingredients: JSON.stringify(state.ingredients),
+                recipes: JSON.stringify(state.recipes),
+                carnes: JSON.stringify(state.carnes || []),
+                updated_at: new Date().toISOString(),
+                updated_by: currentUser ? currentUser.name : 'Sistema',
+            };
+            const { error } = await supabase
+                .from('app_data')
+                .upsert(payload, { onConflict: 'unit_id' });
+            if (error) console.warn('Supabase save error:', error.message);
+        } catch (e) {
+            console.warn('Supabase sync error:', e);
+        }
+    }
+
+    async function loadFromSupabase() {
+        if (!supabase || !state.currentUnit) return false;
+        try {
+            const { data, error } = await supabase
+                .from('app_data')
+                .select('*')
+                .eq('unit_id', state.currentUnit)
+                .single();
+            if (error || !data) return false;
+            state.costs = JSON.parse(data.costs || '[]');
+            state.categories = JSON.parse(data.categories || '[]');
+            state.contacts = JSON.parse(data.contacts || '[]');
+            state.campaigns = JSON.parse(data.campaigns || '[]');
+            state.ingredients = JSON.parse(data.ingredients || '[]');
+            state.recipes = JSON.parse(data.recipes || '[]');
+            state.carnes = JSON.parse(data.carnes || '[]');
+            // Also update localStorage
+            localStorage.setItem(storageKey(STORAGE_KEYS.COSTS_PREFIX), data.costs || '[]');
+            localStorage.setItem(storageKey(STORAGE_KEYS.CATEGORIES_PREFIX), data.categories || '[]');
+            localStorage.setItem(storageKey(STORAGE_KEYS.CONTACTS_PREFIX), data.contacts || '[]');
+            localStorage.setItem(storageKey(STORAGE_KEYS.CAMPAIGNS_PREFIX), data.campaigns || '[]');
+            localStorage.setItem(STORAGE_KEYS.INGREDIENTS, data.ingredients || '[]');
+            localStorage.setItem(STORAGE_KEYS.RECIPES, data.recipes || '[]');
+            console.log('✅ Dados carregados do Supabase');
+            return true;
+        } catch (e) {
+            console.warn('Supabase load error:', e);
+            return false;
+        }
+    }
+
+    async function saveEmployeesToSupabase() {
+        if (!supabase) return;
+        try {
+            const employees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]';
+            const { error } = await supabase
+                .from('app_data')
+                .upsert({ unit_id: 'employees', costs: employees, categories: '[]', contacts: '[]', campaigns: '[]', ingredients: '[]', recipes: '[]', updated_at: new Date().toISOString() }, { onConflict: 'unit_id' });
+            if (error) console.warn('Supabase employees save error:', error.message);
+        } catch (e) {
+            console.warn('Supabase employees sync error:', e);
+        }
+    }
+
+    // ==========================================
+    // Configuration per Business Unit
+    // ==========================================
+    const BUSINESS_CONFIG = {
+        bikeshop: {
+            name: 'Strada BikeShop',
+            shortName: 'BikeShop',
+            hasKg: false,
+            defaultCategories: [
+                { id: 'bs_cat_1', name: 'Peças e Componentes', color: '#F5A623' },
+                { id: 'bs_cat_2', name: 'Acessórios', color: '#00CEFF' },
+                { id: 'bs_cat_3', name: 'Mão de Obra', color: '#6C5CE7' },
+                { id: 'bs_cat_4', name: 'Operacional', color: '#10B981' },
+                { id: 'bs_cat_5', name: 'Marketing', color: '#A855F7' },
+                { id: 'bs_cat_6', name: 'Logística', color: '#EF4444' },
+                { id: 'bs_cat_7', name: 'Infraestrutura', color: '#F97316' },
+                { id: 'bs_cat_8', name: 'Administrativo', color: '#06B6D4' },
+            ],
+        },
+        bikecafe: {
+            name: 'Bike Café',
+            shortName: 'Café',
+            hasKg: true,
+            defaultCategories: [
+                { id: 'bc_cat_1', name: 'Mercearia', color: '#F5A623' },
+                { id: 'bc_cat_2', name: 'Bebidas', color: '#00CEFF' },
+                { id: 'bc_cat_3', name: 'Diversos', color: '#A855F7' },
+                { id: 'bc_cat_4', name: 'Operacional', color: '#10B981' },
+                { id: 'bc_cat_5', name: 'Infraestrutura', color: '#F97316' },
+                { id: 'bc_cat_6', name: 'Administrativo', color: '#06B6D4' },
+            ],
+        },
+    };
+
+    // ==========================================
+    // State
+    // ==========================================
+    const STORAGE_KEYS = {
+        COSTS_PREFIX: 'gestao_strada_costs_',
+        CATEGORIES_PREFIX: 'gestao_strada_cats_',
+        LAST_UNIT: 'gestao_strada_last_unit',
+        CONTACTS_PREFIX: 'gestao_strada_contacts_',
+        CAMPAIGNS_PREFIX: 'gestao_strada_campaigns_',
+        INGREDIENTS: 'gestao_strada_ingredients',
+        RECIPES: 'gestao_strada_recipes',
+        EMPLOYEES: 'gestao_strada_employees',
+        CARNES_PREFIX: 'gestao_strada_carnes_',
+    };
+
+    let state = {
+        currentUnit: null,
+        costs: [],
+        categories: [],
+        contacts: [],
+        campaigns: [],
+        ingredients: [],
+        recipes: [],
+        carnes: [],
+        currentPanel: 0,
+    };
+
+    function storageKey(prefix) {
+        return prefix + state.currentUnit;
+    }
+
+    function loadState() {
+        try {
+            const costs = localStorage.getItem(storageKey(STORAGE_KEYS.COSTS_PREFIX));
+            const cats = localStorage.getItem(storageKey(STORAGE_KEYS.CATEGORIES_PREFIX));
+            const contacts = localStorage.getItem(storageKey(STORAGE_KEYS.CONTACTS_PREFIX));
+            const campaigns = localStorage.getItem(storageKey(STORAGE_KEYS.CAMPAIGNS_PREFIX));
+            const ingredients = localStorage.getItem(STORAGE_KEYS.INGREDIENTS);
+            const recipes = localStorage.getItem(STORAGE_KEYS.RECIPES);
+            const carnes = localStorage.getItem(storageKey(STORAGE_KEYS.CARNES_PREFIX));
+            state.costs = costs ? JSON.parse(costs) : [];
+            state.categories = cats ? JSON.parse(cats) : [...BUSINESS_CONFIG[state.currentUnit].defaultCategories];
+            state.contacts = contacts ? JSON.parse(contacts) : [];
+            state.campaigns = campaigns ? JSON.parse(campaigns) : [];
+            state.ingredients = ingredients ? JSON.parse(ingredients) : [];
+            state.recipes = recipes ? JSON.parse(recipes) : [];
+            state.carnes = carnes ? JSON.parse(carnes) : [];
+        } catch (e) {
+            state.costs = [];
+            state.categories = [...BUSINESS_CONFIG[state.currentUnit].defaultCategories];
+            state.contacts = [];
+            state.campaigns = [];
+            state.ingredients = [];
+            state.recipes = [];
+            state.carnes = [];
+        }
+    }
+
+    function saveState() {
+        localStorage.setItem(storageKey(STORAGE_KEYS.COSTS_PREFIX), JSON.stringify(state.costs));
+        localStorage.setItem(storageKey(STORAGE_KEYS.CATEGORIES_PREFIX), JSON.stringify(state.categories));
+        localStorage.setItem(storageKey(STORAGE_KEYS.CONTACTS_PREFIX), JSON.stringify(state.contacts));
+        localStorage.setItem(storageKey(STORAGE_KEYS.CAMPAIGNS_PREFIX), JSON.stringify(state.campaigns));
+        localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(state.ingredients));
+        localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(state.recipes));
+        localStorage.setItem(storageKey(STORAGE_KEYS.CARNES_PREFIX), JSON.stringify(state.carnes));
+    }
+
+    // ==========================================
+    // DOM
+    // ==========================================
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+
+    const els = {};
+    function cacheEls() {
+        Object.assign(els, {
+            authScreen: $('#authScreen'),
+            unitScreen: $('#unitScreen'),
+            unitGreetName: $('#unitGreetName'),
+            appLayout: $('#appLayout'),
+            sidebarUnit: $('#sidebarUnit'),
+            mobileUnit: $('#mobileUnit'),
+            sidebar: $('#sidebar'),
+            sidebarOverlay: $('#sidebarOverlay'),
+            mobileMenuBtn: $('#mobileMenuBtn'),
+            navItems: $$('.sidebar-nav-item'),
+            panels: $$('.panel'),
+            sidebarUserName: $('#sidebarUserName'),
+            sidebarUserRole: $('#sidebarUserRole'),
+            sidebarUserAvatar: $('#sidebarUserAvatar'),
+            // Dashboard
+            totalGeral: $('#totalGeral'),
+            totalMes: $('#totalMes'),
+            totalLancamentos: $('#totalLancamentos'),
+            mediaCusto: $('#mediaCusto'),
+            categoryBars: $('#categoryBars'),
+            recentEntries: $('#recentEntries'),
+            // Form
+            costForm: $('#costForm'),
+            costDescription: $('#costDescription'),
+            costValue: $('#costValue'),
+            costDate: $('#costDate'),
+            costCategory: $('#costCategory'),
+            costCenter: $('#costCenter'),
+            costNotes: $('#costNotes'),
+            costKg: $('#costKg'),
+            kgFieldGroup: $('#kgFieldGroup'),
+            allEntries: $('#allEntries'),
+            // Categories
+            categoryForm: $('#categoryForm'),
+            catName: $('#catName'),
+            catColor: $('#catColor'),
+            categoriesGrid: $('#categoriesGrid'),
+            // Export
+            exportDateFrom: $('#exportDateFrom'),
+            exportDateTo: $('#exportDateTo'),
+            exportCategory: $('#exportCategory'),
+            exportColumns: $('#exportColumns'),
+            kgExportCol: $('#kgExportCol'),
+            previewHead: $('#previewHead'),
+            previewBody: $('#previewBody'),
+            previewCount: $('#previewCount'),
+            btnExport: $('#btnExport'),
+            btnExportCSV: $('#btnExportCSV'),
+            // Toast & Modal
+            toast: $('#toast'),
+            toastMessage: $('#toastMessage'),
+            modalOverlay: $('#modalOverlay'),
+            modalText: $('#modalText'),
+            modalCancel: $('#modalCancel'),
+            modalConfirm: $('#modalConfirm'),
+            currentDate: $('#currentDate'),
+        });
+    }
+
+    // ==========================================
+    // Auth
+    // ==========================================
+    function setupAuth() {
+        const authForm = $('#authForm');
+        const authUser = $('#authUser');
+        const authPass = $('#authPass');
+        const authError = $('#authError');
+        const togglePass = $('#togglePass');
+
+        if (togglePass) {
+            togglePass.addEventListener('click', () => {
+                const inp = authPass;
+                inp.type = inp.type === 'password' ? 'text' : 'password';
+            });
+        }
+
+        authForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const username = authUser.value.trim().toLowerCase();
+            const password = authPass.value;
+            const user = VALID_USERS.find(u => u.username === username && u.password === password);
+            // Also check employees
+            const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+            const emp = employees.find(u => u.username === username && u.password === password);
+
+            if (user) {
+                currentUser = user;
+                authError.textContent = '';
+                showUnitSelection();
+            } else if (emp) {
+                currentUser = { username: emp.username, name: emp.name, role: emp.role || 'Funcionário', allowedUnit: emp.allowedUnit || 'all' };
+                authError.textContent = '';
+                showUnitSelection();
+            } else {
+                authError.textContent = '⚠ Usuário ou senha incorretos';
+                authError.style.animation = 'none';
+                authError.offsetHeight;
+                authError.style.animation = 'shake 0.4s ease';
+            }
+        });
+    }
+
+    function showUnitSelection() {
+        els.authScreen.style.display = 'none';
+        els.unitScreen.style.display = '';
+        els.unitGreetName.textContent = currentUser.name;
+        els.unitScreen.querySelector('.login-container').style.animation = 'loginFadeIn 0.5s ease-out';
+    }
+
+    function selectUnit(unit) {
+        // Check if employee has unit restriction
+        if (currentUser && currentUser.allowedUnit && currentUser.allowedUnit !== 'all' && currentUser.allowedUnit !== unit) {
+            showToast('⚠ Você não tem acesso a esta unidade');
+            return;
+        }
+        state.currentUnit = unit;
+        localStorage.setItem(STORAGE_KEYS.LAST_UNIT, unit);
+        loadState();
+        els.unitScreen.style.display = 'none';
+        showApp();
+    }
+
+    function backToLogin() {
+        currentUser = null;
+        els.unitScreen.style.display = 'none';
+        els.authScreen.style.display = '';
+        els.authScreen.querySelector('.login-container').style.animation = 'loginFadeIn 0.5s ease-out';
+    }
+
+    // ==========================================
+    // Login
+    // ==========================================
+    function login(unit) {
+        state.currentUnit = unit;
+        localStorage.setItem(STORAGE_KEYS.LAST_UNIT, unit);
+        loadState();
+        showApp();
+    }
+
+    function logout() {
+        // Go to unit selection instead of login
+        state.currentUnit = null;
+        state.currentPanel = 0;
+        localStorage.removeItem(STORAGE_KEYS.LAST_UNIT);
+        els.appLayout.style.display = 'none';
+        els.authScreen.style.display = 'none';
+        els.unitScreen.style.display = '';
+        els.unitGreetName.textContent = currentUser ? currentUser.name : '';
+        els.unitScreen.querySelector('.login-container').style.animation = 'loginFadeIn 0.5s ease-out';
+    }
+
+    function showApp() {
+        const config = BUSINESS_CONFIG[state.currentUnit];
+        els.authScreen.style.display = 'none';
+        els.unitScreen.style.display = 'none';
+        els.appLayout.style.display = 'flex';
+
+        // Update branding
+        els.sidebarUnit.textContent = config.name;
+        els.mobileUnit.textContent = config.shortName;
+
+        // Update user info in sidebar
+        if (currentUser) {
+            els.sidebarUserName.textContent = currentUser.name;
+            els.sidebarUserRole.textContent = currentUser.role;
+            els.sidebarUserAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+        }
+
+        // Show/hide KG field
+        const showKg = config.hasKg;
+        els.kgFieldGroup.style.display = showKg ? '' : 'none';
+        els.kgExportCol.style.display = showKg ? '' : 'none';
+
+        // Show/hide calculator nav (only for bikecafe)
+        const navCalc = $('#navCalculator');
+        if (navCalc) navCalc.style.display = state.currentUnit === 'bikecafe' ? '' : 'none';
+
+        // Show/hide carnê nav (only for bikeshop)
+        const navCarne = $('#navCarne');
+        if (navCarne) navCarne.style.display = state.currentUnit === 'bikeshop' ? '' : 'none';
+
+        setCurrentDate();
+        setupNavigation();
+        setupMobileMenu();
+        setupForms();
+        setupExport();
+        setupModal();
+        setupCurrencyInput();
+        setupContacts();
+        setupMarketing();
+        setupCalculator();
+        setupEmployees();
+        setupCarne();
+        navigateToPanel(0);
+        renderAll();
+        renderAllExtended();
+        checkDueNotifications();
+    }
+
+    function checkAutoLogin() {
+        // No auto-login — always show auth screen
+    }
+
+    // ==========================================
+    // Date
+    // ==========================================
+    function setCurrentDate() {
+        const now = new Date();
+        const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+        els.currentDate.textContent = now.toLocaleDateString('pt-BR', options);
+        els.costDate.value = now.toISOString().split('T')[0];
+    }
+
+    // ==========================================
+    // Sidebar Navigation
+    // ==========================================
+    let navSetup = false;
+    function setupNavigation() {
+        if (navSetup) return;
+        navSetup = true;
+        els.navItems.forEach((item) => {
+            item.addEventListener('click', () => {
+                navigateToPanel(parseInt(item.dataset.panel));
+                closeMobileMenu();
+            });
+        });
+    }
+
+    function navigateToPanel(index) {
+        state.currentPanel = index;
+
+        // Toggle panels
+        els.panels.forEach((p, i) => {
+            if (i === index) {
+                p.classList.add('active');
+                p.style.animation = 'none';
+                p.offsetHeight; // force reflow
+                p.style.animation = '';
+            } else {
+                p.classList.remove('active');
+            }
+        });
+
+        // Update sidebar active
+        els.navItems.forEach((item, i) => {
+            item.classList.toggle('active', i === index);
+        });
+
+        // Re-render
+        if (index === 0) renderDashboard();
+        if (index === 3) updateExportPreview();
+        if (index === 8) renderCarnes();
+        if (index === 9) renderCostEvolution();
+    }
+
+    // ==========================================
+    // Mobile Menu
+    // ==========================================
+    let mobileSetup = false;
+    function setupMobileMenu() {
+        if (mobileSetup) return;
+        mobileSetup = true;
+        els.mobileMenuBtn.addEventListener('click', openMobileMenu);
+        els.sidebarOverlay.addEventListener('click', closeMobileMenu);
+    }
+
+    function openMobileMenu() {
+        els.sidebar.classList.add('open');
+        els.sidebarOverlay.classList.add('show');
+    }
+
+    function closeMobileMenu() {
+        els.sidebar.classList.remove('open');
+        els.sidebarOverlay.classList.remove('show');
+    }
+
+    // ==========================================
+    // Currency & KG Input
+    // ==========================================
+    let currencySetup = false;
+    function setupCurrencyInput() {
+        if (currencySetup) return;
+        currencySetup = true;
+
+        els.costValue.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            if (!val) { e.target.value = ''; return; }
+            val = (parseInt(val) / 100).toFixed(2);
+            e.target.value = val.replace('.', ',');
+        });
+
+        els.costKg.addEventListener('input', (e) => {
+            // Allow only numbers and comma
+            e.target.value = e.target.value.replace(/[^0-9,]/g, '');
+        });
+    }
+
+    function parseCurrency(str) {
+        if (!str) return 0;
+        return parseFloat(str.replace(/\./g, '').replace(',', '.')) || 0;
+    }
+
+    function formatCurrency(num) {
+        return 'R$ ' + num.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        });
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    function parseKg(str) {
+        if (!str) return null;
+        const val = parseFloat(str.replace(',', '.'));
+        return isNaN(val) ? null : val;
+    }
+
+    // ==========================================
+    // Forms
+    // ==========================================
+    let formsSetup = false;
+    function setupForms() {
+        if (formsSetup) return;
+        formsSetup = true;
+
+        els.costForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            addCost();
+        });
+
+        els.categoryForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            addCategory();
+        });
+    }
+
+    function addCost() {
+        const desc = els.costDescription.value.trim();
+        const value = parseCurrency(els.costValue.value);
+        const date = els.costDate.value;
+        const catId = els.costCategory.value;
+        const center = els.costCenter.value.trim();
+        const notes = els.costNotes.value.trim();
+        const kg = BUSINESS_CONFIG[state.currentUnit].hasKg ? parseKg(els.costKg.value) : null;
+        const dueDate = ($('#costDueDate') || {}).value || null;
+
+        if (!desc || value <= 0 || !date || !catId) {
+            showToast('⚠ Preencha todos os campos obrigatórios');
+            return;
+        }
+
+        const cost = {
+            id: 'cost_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            description: desc,
+            value: value,
+            date: date,
+            categoryId: catId,
+            costCenter: center,
+            notes: notes,
+            kg: kg,
+            dueDate: dueDate || null,
+            paid: dueDate ? false : true,
+            unit: state.currentUnit,
+            createdAt: new Date().toISOString(),
+        };
+
+        state.costs.unshift(cost);
+        saveState();
+        renderAll();
+
+        els.costForm.reset();
+        els.costDate.value = new Date().toISOString().split('T')[0];
+        const dueDateInput = $('#costDueDate');
+        if (dueDateInput) dueDateInput.value = '';
+        showToast('✅ Custo lançado com sucesso!');
+    }
+
+    function addCategory() {
+        const name = els.catName.value.trim();
+        const color = els.catColor.value;
+        if (!name) { showToast('Informe o nome da categoria'); return; }
+        if (state.categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            showToast('Categoria já existe');
+            return;
+        }
+
+        state.categories.push({
+            id: 'cat_' + Date.now(),
+            name: name,
+            color: color,
+        });
+        saveState();
+        renderAll();
+        els.catName.value = '';
+        showToast('✅ Categoria adicionada!');
+    }
+
+    // ==========================================
+    // Delete
+    // ==========================================
+    let pendingDelete = null;
+    let modalSetup = false;
+
+    function setupModal() {
+        if (modalSetup) return;
+        modalSetup = true;
+
+        els.modalCancel.addEventListener('click', closeModal);
+        els.modalOverlay.addEventListener('click', (e) => {
+            if (e.target === els.modalOverlay) closeModal();
+        });
+        els.modalConfirm.addEventListener('click', () => {
+            if (pendingDelete) { pendingDelete(); pendingDelete = null; }
+            closeModal();
+        });
+    }
+
+    function showModal(text, onConfirm) {
+        els.modalText.textContent = text;
+        pendingDelete = onConfirm;
+        els.modalOverlay.classList.add('show');
+    }
+
+    function closeModal() {
+        els.modalOverlay.classList.remove('show');
+        pendingDelete = null;
+    }
+
+    function deleteCost(id) {
+        showModal('Deseja realmente excluir este lançamento?', () => {
+            state.costs = state.costs.filter(c => c.id !== id);
+            saveState();
+            renderAll();
+            showToast('Lançamento excluído');
+        });
+    }
+
+    function deleteCategory(id) {
+        const usedCount = state.costs.filter(c => c.categoryId === id).length;
+        const msg = usedCount > 0
+            ? `Esta categoria tem ${usedCount} lançamento(s). Deseja excluí-la?`
+            : 'Deseja realmente excluir esta categoria?';
+        showModal(msg, () => {
+            state.categories = state.categories.filter(c => c.id !== id);
+            saveState();
+            renderAll();
+            showToast('Categoria excluída');
+        });
+    }
+
+    // ==========================================
+    // Toast
+    // ==========================================
+    let toastTimeout = null;
+    function showToast(message) {
+        els.toastMessage.textContent = message;
+        els.toast.classList.add('show');
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => els.toast.classList.remove('show'), 2500);
+    }
+
+    // ==========================================
+    // Rendering
+    // ==========================================
+    function renderAll() {
+        renderDashboard();
+        renderCategorySelects();
+        renderAllEntries();
+        renderCategories();
+        updateExportPreview();
+    }
+
+    function renderDashboard() {
+        const total = state.costs.reduce((s, c) => s + c.value, 0);
+        const now = new Date();
+        const monthCosts = state.costs.filter(c => {
+            const d = new Date(c.date);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const monthTotal = monthCosts.reduce((s, c) => s + c.value, 0);
+        const avg = state.costs.length > 0 ? total / state.costs.length : 0;
+
+        animateValue(els.totalGeral, formatCurrency(total));
+        animateValue(els.totalMes, formatCurrency(monthTotal));
+        animateValue(els.totalLancamentos, state.costs.length.toString());
+        animateValue(els.mediaCusto, formatCurrency(avg));
+
+        // Contas a Receber (from carnê - unpaid installments)
+        const contasReceberEl = $('#contasReceber');
+        if (contasReceberEl) {
+            let totalReceber = 0;
+            if (state.carnes && state.carnes.length > 0) {
+                state.carnes.forEach(carne => {
+                    carne.installments.forEach(p => {
+                        if (!p.paid) totalReceber += p.value;
+                    });
+                });
+            }
+            animateValue(contasReceberEl, formatCurrency(totalReceber));
+        }
+
+        // Contas a Pagar (costs with dueDate and not paid)
+        const contasPagarEl = $('#contasPagar');
+        if (contasPagarEl) {
+            const totalPagar = state.costs.filter(c => c.dueDate && !c.paid).reduce((s, c) => s + c.value, 0);
+            animateValue(contasPagarEl, formatCurrency(totalPagar));
+        }
+
+        renderCategoryBars(total);
+        renderRecentEntries();
+        renderContasPagarList();
+
+        // Dynamic KPIs
+        const kpiRow = $('#dashKpiRow');
+        if (kpiRow) {
+            const kpis = [];
+
+            // Top Category
+            if (state.costs.length > 0) {
+                const catTotals = {};
+                state.costs.forEach(c => {
+                    const cat = state.categories.find(cat => cat.id === c.categoryId);
+                    const name = cat ? cat.name : 'Sem categoria';
+                    catTotals[name] = (catTotals[name] || 0) + c.value;
+                });
+                const topCat = Object.entries(catTotals).sort((a, b) => b[1] - a[1])[0];
+                if (topCat) {
+                    kpis.push({ icon: '🏷️', label: 'Top Categoria', value: topCat[0], sub: formatCurrency(topCat[1]) });
+                }
+            }
+
+            // Last 30 days
+            const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+            const last30 = state.costs.filter(c => new Date(c.date) >= thirtyDaysAgo);
+            const last30Total = last30.reduce((s, c) => s + c.value, 0);
+            kpis.push({ icon: '📆', label: 'Últimos 30 dias', value: formatCurrency(last30Total), sub: `${last30.length} lançamento(s)` });
+
+            // Daily average
+            if (state.costs.length > 0) {
+                const dates = state.costs.map(c => new Date(c.date).getTime());
+                const minDate = new Date(Math.min(...dates));
+                const daySpan = Math.max(1, Math.ceil((now - minDate) / (1000 * 60 * 60 * 24)));
+                const dailyAvg = total / daySpan;
+                kpis.push({ icon: '⚡', label: 'Média Diária', value: formatCurrency(dailyAvg), sub: `em ${daySpan} dia(s)` });
+            }
+
+            // Month trend
+            const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const prevMonthCosts = state.costs.filter(c => {
+                const d = new Date(c.date);
+                return d.getMonth() === prevMonth.getMonth() && d.getFullYear() === prevMonth.getFullYear();
+            });
+            const prevTotal = prevMonthCosts.reduce((s, c) => s + c.value, 0);
+            if (prevTotal > 0) {
+                const variation = ((monthTotal - prevTotal) / prevTotal * 100).toFixed(1);
+                const trend = variation > 0 ? '↑' : variation < 0 ? '↓' : '→';
+                const trendClass = variation > 0 ? 'kpi-up' : variation < 0 ? 'kpi-down' : 'kpi-neutral';
+                kpis.push({ icon: trend, label: 'vs Mês Anterior', value: `${variation > 0 ? '+' : ''}${variation}%`, sub: formatCurrency(prevTotal), extraClass: trendClass });
+            }
+
+            kpiRow.innerHTML = kpis.map((k, i) => `
+                <div class="dash-kpi-card ${k.extraClass || ''}" style="animation-delay:${i * 0.08}s">
+                    <div class="dash-kpi-icon">${k.icon}</div>
+                    <div class="dash-kpi-info">
+                        <span class="dash-kpi-label">${k.label}</span>
+                        <span class="dash-kpi-value">${k.value}</span>
+                        ${k.sub ? `<span class="dash-kpi-sub">${k.sub}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    function animateValue(el, newVal) {
+        if (el.textContent !== newVal) {
+            el.textContent = newVal;
+            el.classList.add('value-updated');
+            setTimeout(() => el.classList.remove('value-updated'), 400);
+        }
+    }
+
+    function renderCategoryBars(total) {
+        if (state.costs.length === 0) {
+            els.categoryBars.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><p>Nenhum lançamento ainda</p></div>`;
+            return;
+        }
+
+        const catTotals = {};
+        state.costs.forEach(c => { catTotals[c.categoryId] = (catTotals[c.categoryId] || 0) + c.value; });
+        const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+
+        els.categoryBars.innerHTML = sorted.map(([catId, catTotal], idx) => {
+            const cat = state.categories.find(c => c.id === catId);
+            const name = cat ? cat.name : 'Sem categoria';
+            const color = cat ? cat.color : '#666';
+            const pct = total > 0 ? (catTotal / total) * 100 : 0;
+            return `<div class="cat-bar-item" style="animation-delay:${idx * 0.08}s">
+                <div class="cat-bar-dot" style="background:${color};color:${color}"></div>
+                <div class="cat-bar-info">
+                    <div class="cat-bar-header">
+                        <span class="cat-bar-name">${esc(name)}</span>
+                        <span class="cat-bar-value">${formatCurrency(catTotal)} (${pct.toFixed(1)}%)</span>
+                    </div>
+                    <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${pct}%;background:${color};color:${color}"></div></div>
+                </div>
+            </div>`;
+        }).join('');
+
+        requestAnimationFrame(() => {
+            els.categoryBars.querySelectorAll('.cat-bar-fill').forEach(bar => {
+                const w = bar.style.width;
+                bar.style.width = '0%';
+                requestAnimationFrame(() => { bar.style.width = w; });
+            });
+        });
+    }
+
+    function renderRecentEntries() {
+        const recent = state.costs.slice(0, 5);
+        if (recent.length === 0) {
+            els.recentEntries.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Adicione seu primeiro custo</p></div>`;
+            return;
+        }
+        els.recentEntries.innerHTML = recent.map((c, i) => renderEntryItem(c, i, false)).join('');
+    }
+
+    function renderAllEntries() {
+        if (state.costs.length === 0) {
+            els.allEntries.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Nenhum lançamento registrado</p></div>`;
+            return;
+        }
+        els.allEntries.innerHTML = state.costs.map((c, i) => renderEntryItem(c, i, true)).join('');
+    }
+
+    function renderEntryItem(cost, idx, showDelete) {
+        const cat = state.categories.find(c => c.id === cost.categoryId);
+        const catName = cat ? cat.name : 'Sem categoria';
+        const color = cat ? cat.color : '#666';
+        const kgBadge = (cost.kg != null && cost.kg > 0)
+            ? `<span class="entry-kg">${cost.kg.toFixed(2).replace('.', ',')} kg</span>`
+            : '';
+        const del = showDelete
+            ? `<button class="entry-delete" onclick="GestaoStrada.deleteCost('${cost.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`
+            : '';
+        return `<div class="entry-item" style="animation-delay:${idx * 0.05}s">
+            <div class="entry-color" style="background:${color}"></div>
+            <div class="entry-info">
+                <div class="entry-desc">${esc(cost.description)}</div>
+                <div class="entry-meta">
+                    <span>${formatDate(cost.date)}</span>
+                    <span class="dot"></span>
+                    <span>${esc(catName)}</span>
+                    ${cost.costCenter ? `<span class="dot"></span><span>${esc(cost.costCenter)}</span>` : ''}
+                    ${kgBadge}
+                </div>
+            </div>
+            <span class="entry-value">${formatCurrency(cost.value)}</span>
+            ${del}
+        </div>`;
+    }
+
+    function renderCategorySelects() {
+        const opts = state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+        els.costCategory.innerHTML = `<option value="">Selecione uma categoria</option>${opts}`;
+        els.exportCategory.innerHTML = `<option value="">Todas as categorias</option>${opts}`;
+    }
+
+    function renderCategories() {
+        if (state.categories.length === 0) {
+            els.categoriesGrid.innerHTML = `<div class="empty-state"><p>Nenhuma categoria cadastrada</p></div>`;
+            return;
+        }
+        els.categoriesGrid.innerHTML = state.categories.map((cat, idx) => {
+            const count = state.costs.filter(c => c.categoryId === cat.id).length;
+            return `<div class="category-card" style="animation-delay:${idx * 0.05}s">
+                <div class="category-color" style="background:${cat.color};color:${cat.color}"></div>
+                <span class="category-name">${esc(cat.name)}</span>
+                <span class="category-count">${count} custo${count !== 1 ? 's' : ''}</span>
+                <button class="category-delete" onclick="GestaoStrada.deleteCategory('${cat.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>`;
+        }).join('');
+    }
+
+    // ==========================================
+    // Export
+    // ==========================================
+    let exportSetup = false;
+    function setupExport() {
+        if (exportSetup) return;
+        exportSetup = true;
+
+        els.exportDateFrom.addEventListener('change', updateExportPreview);
+        els.exportDateTo.addEventListener('change', updateExportPreview);
+        els.exportCategory.addEventListener('change', updateExportPreview);
+        $$('.checkbox-group input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', updateExportPreview);
+        });
+
+        els.btnExport.addEventListener('click', exportExcel);
+        els.btnExportCSV.addEventListener('click', exportCSV);
+    }
+
+    function getFilteredCosts() {
+        let filtered = [...state.costs];
+        const from = els.exportDateFrom.value;
+        const to = els.exportDateTo.value;
+        const catId = els.exportCategory.value;
+        if (from) filtered = filtered.filter(c => c.date >= from);
+        if (to) filtered = filtered.filter(c => c.date <= to);
+        if (catId) filtered = filtered.filter(c => c.categoryId === catId);
+        return filtered;
+    }
+
+    function getSelectedColumns() {
+        const cols = [];
+        els.exportColumns.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            if (cb.checked && cb.closest('.kg-export-col') !== null) {
+                if (BUSINESS_CONFIG[state.currentUnit].hasKg) cols.push(cb.value);
+            } else if (cb.checked) {
+                cols.push(cb.value);
+            }
+        });
+        return cols;
+    }
+
+    const COLUMN_LABELS = {
+        description: 'Descrição',
+        value: 'Valor (R$)',
+        date: 'Data',
+        category: 'Categoria',
+        center: 'Centro de Custo',
+        notes: 'Observações',
+        kg: 'Peso (KG)',
+    };
+
+    function getCostRowData(cost, columns) {
+        const cat = state.categories.find(c => c.id === cost.categoryId);
+        const row = {};
+        columns.forEach(col => {
+            switch (col) {
+                case 'description': row[COLUMN_LABELS[col]] = cost.description; break;
+                case 'value': row[COLUMN_LABELS[col]] = cost.value; break;
+                case 'date': row[COLUMN_LABELS[col]] = formatDate(cost.date); break;
+                case 'category': row[COLUMN_LABELS[col]] = cat ? cat.name : 'Sem categoria'; break;
+                case 'center': row[COLUMN_LABELS[col]] = cost.costCenter || ''; break;
+                case 'notes': row[COLUMN_LABELS[col]] = cost.notes || ''; break;
+                case 'kg': row[COLUMN_LABELS[col]] = cost.kg != null ? cost.kg : ''; break;
+            }
+        });
+        return row;
+    }
+
+    function updateExportPreview() {
+        const filtered = getFilteredCosts();
+        const columns = getSelectedColumns();
+        els.previewCount.textContent = `${filtered.length} registro${filtered.length !== 1 ? 's' : ''}`;
+
+        els.previewHead.innerHTML = columns.map(col => `<th>${COLUMN_LABELS[col]}</th>`).join('');
+
+        const preview = filtered.slice(0, 10);
+        if (preview.length === 0) {
+            els.previewBody.innerHTML = `<tr><td colspan="${columns.length}" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Nenhum registro encontrado</td></tr>`;
+            return;
+        }
+
+        els.previewBody.innerHTML = preview.map(cost => {
+            const row = getCostRowData(cost, columns);
+            return `<tr>${columns.map(col => {
+                const val = row[COLUMN_LABELS[col]];
+                const display = col === 'value' ? formatCurrency(val) : esc(String(val != null ? val : ''));
+                return `<td>${display}</td>`;
+            }).join('')}</tr>`;
+        }).join('');
+
+        if (filtered.length > 10) {
+            els.previewBody.innerHTML += `<tr><td colspan="${columns.length}" style="text-align:center;color:var(--text-muted);font-size:0.75rem;padding:0.5rem;">+ ${filtered.length - 10} registros adicionais</td></tr>`;
+        }
+    }
+
+    function exportExcel() {
+        const filtered = getFilteredCosts();
+        const columns = getSelectedColumns();
+        if (filtered.length === 0) { showToast('Nenhum dado para exportar'); return; }
+        if (typeof XLSX === 'undefined') { showToast('Erro: biblioteca XLSX não carregada'); return; }
+
+        const data = filtered.map(c => getCostRowData(c, columns));
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        ws['!cols'] = columns.map(col => {
+            const label = COLUMN_LABELS[col];
+            let max = label.length;
+            filtered.forEach(cost => {
+                const row = getCostRowData(cost, columns);
+                const val = String(row[label] || '');
+                if (val.length > max) max = val.length;
+            });
+            return { wch: Math.min(max + 2, 40) };
+        });
+
+        const wb = XLSX.utils.book_new();
+        const unitName = BUSINESS_CONFIG[state.currentUnit].name;
+        XLSX.utils.book_append_sheet(wb, ws, 'Custos');
+
+        const total = filtered.reduce((s, c) => s + c.value, 0);
+        const summaryData = [
+            { 'Resumo': 'Unidade', 'Valor': unitName },
+            { 'Resumo': 'Total de Registros', 'Valor': filtered.length },
+            { 'Resumo': 'Valor Total', 'Valor': total },
+            { 'Resumo': 'Média por Custo', 'Valor': filtered.length > 0 ? (total / filtered.length) : 0 },
+            { 'Resumo': 'Data de Exportação', 'Valor': new Date().toLocaleDateString('pt-BR') },
+        ];
+        const ws2 = XLSX.utils.json_to_sheet(summaryData);
+        ws2['!cols'] = [{ wch: 22 }, { wch: 22 }];
+        XLSX.utils.book_append_sheet(wb, ws2, 'Resumo');
+
+        const filename = `GestaoStrada_${unitName.replace(/\s/g, '')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        showToast(`📊 Exportado: ${filename}`);
+    }
+
+    function exportCSV() {
+        const filtered = getFilteredCosts();
+        const columns = getSelectedColumns();
+        if (filtered.length === 0) { showToast('Nenhum dado para exportar'); return; }
+
+        const headers = columns.map(c => COLUMN_LABELS[c]);
+        const rows = filtered.map(cost => {
+            const row = getCostRowData(cost, columns);
+            return columns.map(col => {
+                let val = String(row[COLUMN_LABELS[col]] != null ? row[COLUMN_LABELS[col]] : '');
+                if (val.includes(',') || val.includes('"') || val.includes('\n')) {
+                    val = '"' + val.replace(/"/g, '""') + '"';
+                }
+                return val;
+            }).join(';');
+        });
+
+        const csv = '\uFEFF' + headers.join(';') + '\n' + rows.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const unitName = BUSINESS_CONFIG[state.currentUnit].name.replace(/\s/g, '');
+        a.download = `GestaoStrada_${unitName}_${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('📄 CSV exportado com sucesso!');
+    }
+
+    // ==========================================
+    // Utilities
+    // ==========================================
+    function esc(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    // ==========================================
+    // Contacts
+    // ==========================================
+    let contactsSetup = false;
+    function setupContacts() {
+        if (contactsSetup) return;
+        contactsSetup = true;
+        const form = $('#contactForm');
+        const csvDrop = $('#csvDropArea');
+        const csvInput = $('#csvFileInput');
+        const search = $('#contactSearch');
+
+        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); addContact(); });
+        if (csvDrop) {
+            csvDrop.addEventListener('click', () => csvInput.click());
+            csvDrop.addEventListener('dragover', (e) => { e.preventDefault(); csvDrop.classList.add('drag-over'); });
+            csvDrop.addEventListener('dragleave', () => csvDrop.classList.remove('drag-over'));
+            csvDrop.addEventListener('drop', (e) => { e.preventDefault(); csvDrop.classList.remove('drag-over'); if (e.dataTransfer.files[0]) importCSV(e.dataTransfer.files[0]); });
+        }
+        if (csvInput) csvInput.addEventListener('change', (e) => { if (e.target.files[0]) importCSV(e.target.files[0]); });
+        if (search) search.addEventListener('input', () => renderContacts(search.value));
+    }
+
+    function addContact() {
+        const name = $('#contactName').value.trim();
+        const phone = $('#contactPhone').value.trim();
+        const email = $('#contactEmail').value.trim();
+        const tags = $('#contactTags').value.trim().split(',').map(t => t.trim()).filter(Boolean);
+        if (!name) { showToast('⚠ Informe o nome do contato'); return; }
+        state.contacts.push({ id: 'ct_' + Date.now(), name, phone, email, tags, createdAt: new Date().toISOString() });
+        saveState(); renderContacts(); $('#contactForm').reset();
+        showToast('✅ Contato adicionado!');
+    }
+
+    function importCSV(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const lines = e.target.result.split('\n').filter(l => l.trim());
+            let imported = 0;
+            lines.forEach(line => {
+                const parts = line.split(';').map(p => p.trim());
+                if (parts[0] && parts[0].toLowerCase() !== 'nome') {
+                    state.contacts.push({
+                        id: 'ct_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                        name: parts[0] || '', phone: parts[1] || '', email: parts[2] || '',
+                        tags: (parts[3] || '').split(',').map(t => t.trim()).filter(Boolean),
+                        createdAt: new Date().toISOString(),
+                    });
+                    imported++;
+                }
+            });
+            saveState(); renderContacts();
+            showToast(`✅ ${imported} contato(s) importado(s)!`);
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function deleteContact(id) {
+        showModal('Deseja excluir este contato?', () => {
+            state.contacts = state.contacts.filter(c => c.id !== id);
+            saveState(); renderContacts();
+            showToast('Contato excluído');
+        });
+    }
+
+    function renderContacts(filter) {
+        const list = $('#contactsList');
+        const count = $('#contactsCount');
+        if (!list) return;
+        let contacts = state.contacts;
+        if (filter) {
+            const f = filter.toLowerCase();
+            contacts = contacts.filter(c => c.name.toLowerCase().includes(f) || (c.email || '').toLowerCase().includes(f) || (c.phone || '').includes(f));
+        }
+        count.textContent = `${contacts.length} contato(s)`;
+        if (contacts.length === 0) {
+            list.innerHTML = '<div class="empty-state"><p>Nenhum contato cadastrado</p></div>';
+            return;
+        }
+        list.innerHTML = contacts.map((c, i) => `<div class="entry-item" style="animation-delay:${i * 0.03}s">
+            <div class="entry-color" style="background:#00CEFF"></div>
+            <div class="entry-info">
+                <div class="entry-desc">${esc(c.name)}</div>
+                <div class="entry-meta">
+                    ${c.phone ? `<span>📱 ${esc(c.phone)}</span>` : ''}
+                    ${c.email ? `<span class="dot"></span><span>✉ ${esc(c.email)}</span>` : ''}
+                    ${c.tags.length ? `<span class="dot"></span><span>🏷 ${c.tags.map(t => esc(t)).join(', ')}</span>` : ''}
+                </div>
+            </div>
+            <button class="entry-delete" onclick="GestaoStrada.deleteContact('${c.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>`).join('');
+    }
+
+    // ==========================================
+    // Marketing
+    // ==========================================
+    let marketingSetup = false;
+    function setupMarketing() {
+        if (marketingSetup) return;
+        marketingSetup = true;
+        const form = $('#campaignForm');
+        const btnPreview = $('#btnPreviewCampaign');
+        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); sendCampaign(); });
+        if (btnPreview) btnPreview.addEventListener('click', previewCampaign);
+    }
+
+    function updateRecipientsSelect() {
+        const sel = $('#campaignRecipients');
+        if (!sel) return;
+        const tags = new Set();
+        state.contacts.forEach(c => c.tags.forEach(t => tags.add(t)));
+        sel.innerHTML = `<option value="all">Todos os contatos (${state.contacts.length})</option>` +
+            [...tags].map(t => `<option value="tag:${t}">Tag: ${esc(t)}</option>`).join('');
+    }
+
+    function previewCampaign() {
+        const title = $('#campaignTitle').value.trim();
+        const msg = $('#campaignMessage').value.trim();
+        const preview = $('#campaignPreview');
+        const bubble = $('#previewBubble');
+        const rCount = $('#recipientCount');
+        if (!title || !msg) { showToast('⚠ Preencha título e mensagem'); return; }
+        const recipients = getRecipients();
+        bubble.innerHTML = `<strong>${esc(title)}</strong><br><br>${esc(msg).replace(/\n/g, '<br>')}`;
+        rCount.textContent = `📤 Será enviada para ${recipients.length} contato(s)`;
+        preview.style.display = '';
+    }
+
+    function getRecipients() {
+        const val = ($('#campaignRecipients') || {}).value || 'all';
+        if (val === 'all') return state.contacts;
+        if (val.startsWith('tag:')) {
+            const tag = val.slice(4);
+            return state.contacts.filter(c => c.tags.includes(tag));
+        }
+        return state.contacts;
+    }
+
+    function sendCampaign() {
+        const title = $('#campaignTitle').value.trim();
+        const msg = $('#campaignMessage').value.trim();
+        if (!title || !msg) { showToast('⚠ Preencha título e mensagem'); return; }
+        const recipients = getRecipients();
+        if (recipients.length === 0) { showToast('⚠ Nenhum destinatário encontrado'); return; }
+        state.campaigns.unshift({
+            id: 'camp_' + Date.now(), title, message: msg,
+            recipientCount: recipients.length, sentAt: new Date().toISOString(),
+            sentBy: currentUser ? currentUser.name : 'Sistema',
+        });
+        saveState(); renderCampaigns();
+        $('#campaignForm').reset();
+        $('#campaignPreview').style.display = 'none';
+        showToast(`✅ Campanha "${title}" disparada para ${recipients.length} contato(s)!`);
+    }
+
+    function renderCampaigns() {
+        const list = $('#campaignsList');
+        if (!list) return;
+        if (state.campaigns.length === 0) {
+            list.innerHTML = '<div class="empty-state"><p>Nenhuma campanha enviada</p></div>';
+            return;
+        }
+        list.innerHTML = state.campaigns.map((c, i) => {
+            const d = new Date(c.sentAt);
+            const dateStr = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return `<div class="entry-item" style="animation-delay:${i * 0.03}s">
+                <div class="entry-color" style="background:#A855F7"></div>
+                <div class="entry-info">
+                    <div class="entry-desc">${esc(c.title)}</div>
+                    <div class="entry-meta"><span>📤 ${c.recipientCount} destinatário(s)</span><span class="dot"></span><span>${dateStr}</span><span class="dot"></span><span>por ${esc(c.sentBy)}</span></div>
+                </div>
+                <span class="entry-value" style="color:#10B981;font-size:0.8rem;">✓ Enviada</span>
+            </div>`;
+        }).join('');
+    }
+
+    // ==========================================
+    // Calculator (Bike Café)
+    // ==========================================
+    let calcSetup = false;
+    function setupCalculator() {
+        if (calcSetup) return;
+        calcSetup = true;
+        const ingForm = $('#ingredientForm');
+        const recForm = $('#recipeForm');
+        const btnAddIng = $('#btnAddRecipeIng');
+        const ingCostInput = $('#ingCost');
+
+        if (ingCostInput) ingCostInput.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            if (!val) { e.target.value = ''; return; }
+            val = (parseInt(val) / 100).toFixed(2);
+            e.target.value = val.replace('.', ',');
+        });
+        const recipePriceInput = $('#recipePrice');
+        if (recipePriceInput) recipePriceInput.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            if (!val) { e.target.value = ''; return; }
+            val = (parseInt(val) / 100).toFixed(2);
+            e.target.value = val.replace('.', ',');
+        });
+
+        if (ingForm) ingForm.addEventListener('submit', (e) => { e.preventDefault(); addIngredient(); });
+        if (recForm) recForm.addEventListener('submit', (e) => { e.preventDefault(); addRecipe(); });
+        if (btnAddIng) btnAddIng.addEventListener('click', addRecipeIngredientRow);
+    }
+
+    function switchCalcTab(tab) {
+        const tabs = { ingredients: 'calcIngredients', recipes: 'calcRecipes', profitTable: 'calcProfitTable' };
+        const tabBtns = { ingredients: 'tabIngredients', recipes: 'tabRecipes', profitTable: 'tabProfitTable' };
+        Object.keys(tabs).forEach(k => {
+            const el = $('#' + tabs[k]);
+            const btn = $('#' + tabBtns[k]);
+            if (el) el.classList.toggle('active', k === tab);
+            if (btn) btn.classList.toggle('active', k === tab);
+        });
+        if (tab === 'profitTable') renderProfitTable();
+        if (tab === 'recipes') { renderIngredientOptions(); renderRecipes(); }
+    }
+
+    function addIngredient() {
+        const name = $('#ingName').value.trim();
+        const unit = $('#ingUnit').value;
+        const cost = parseCurrency($('#ingCost').value);
+        const supplier = $('#ingSupplier').value.trim();
+        if (!name || cost <= 0) { showToast('⚠ Preencha nome e custo'); return; }
+        state.ingredients.push({ id: 'ing_' + Date.now(), name, unit, cost, supplier });
+        saveState(); renderIngredients(); $('#ingredientForm').reset();
+        showToast('✅ Ingrediente cadastrado!');
+    }
+
+    function deleteIngredient(id) {
+        showModal('Deseja excluir este ingrediente?', () => {
+            state.ingredients = state.ingredients.filter(i => i.id !== id);
+            saveState(); renderIngredients();
+            showToast('Ingrediente excluído');
+        });
+    }
+
+    function renderIngredients() {
+        const list = $('#ingredientsList');
+        if (!list) return;
+        if (state.ingredients.length === 0) {
+            list.innerHTML = '<div class="empty-state"><p>Nenhum ingrediente cadastrado</p></div>';
+            return;
+        }
+        list.innerHTML = state.ingredients.map((ing, i) => `<div class="entry-item" style="animation-delay:${i * 0.03}s">
+            <div class="entry-color" style="background:#F5A623"></div>
+            <div class="entry-info">
+                <div class="entry-desc">${esc(ing.name)}</div>
+                <div class="entry-meta"><span>${ing.unit.toUpperCase()}</span>${ing.supplier ? `<span class="dot"></span><span>${esc(ing.supplier)}</span>` : ''}</div>
+            </div>
+            <span class="entry-value">${formatCurrency(ing.cost)}/${ing.unit}</span>
+            <button class="entry-delete" onclick="GestaoStrada.deleteIngredient('${ing.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>`).join('');
+    }
+
+    function addRecipeIngredientRow() {
+        const container = $('#recipeIngredientRows');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'form-row recipe-ing-row';
+        row.style.marginBottom = '0.5rem';
+        const opts = state.ingredients.map(i => `<option value="${i.id}">${esc(i.name)} (${formatCurrency(i.cost)}/${i.unit})</option>`).join('');
+        row.innerHTML = `<div class="form-group" style="flex:2"><select class="recipe-ing-select"><option value="">Selecione</option>${opts}</select></div>
+            <div class="form-group" style="flex:1"><input type="text" class="recipe-ing-qty" placeholder="Qtd" inputmode="decimal"></div>
+            <button type="button" class="entry-delete" onclick="this.closest('.recipe-ing-row').remove()" style="align-self:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+        container.appendChild(row);
+    }
+
+    function renderIngredientOptions() {
+        $$('.recipe-ing-select').forEach(sel => {
+            const current = sel.value;
+            const opts = state.ingredients.map(i => `<option value="${i.id}" ${i.id === current ? 'selected' : ''}>${esc(i.name)} (${formatCurrency(i.cost)}/${i.unit})</option>`).join('');
+            sel.innerHTML = `<option value="">Selecione</option>${opts}`;
+        });
+    }
+
+    function addRecipe() {
+        const name = $('#recipeName').value.trim();
+        const price = parseCurrency($('#recipePrice').value);
+        if (!name || price <= 0) { showToast('⚠ Preencha nome e preço de venda'); return; }
+        const ingRows = $$('.recipe-ing-row');
+        const ingredients = [];
+        ingRows.forEach(row => {
+            const ingId = row.querySelector('.recipe-ing-select').value;
+            const qty = parseFloat((row.querySelector('.recipe-ing-qty').value || '0').replace(',', '.'));
+            if (ingId && qty > 0) ingredients.push({ ingredientId: ingId, quantity: qty });
+        });
+        if (ingredients.length === 0) { showToast('⚠ Adicione ao menos um ingrediente'); return; }
+        state.recipes.push({ id: 'rec_' + Date.now(), name, price, ingredients });
+        saveState(); renderRecipes(); $('#recipeForm').reset(); $('#recipeIngredientRows').innerHTML = '';
+        showToast('✅ Receita salva!');
+    }
+
+    function deleteRecipe(id) {
+        showModal('Deseja excluir esta receita?', () => {
+            state.recipes = state.recipes.filter(r => r.id !== id);
+            saveState(); renderRecipes();
+            showToast('Receita excluída');
+        });
+    }
+
+    function calcRecipeCost(recipe) {
+        let total = 0;
+        recipe.ingredients.forEach(ri => {
+            const ing = state.ingredients.find(i => i.id === ri.ingredientId);
+            if (ing) total += ing.cost * ri.quantity;
+        });
+        return total;
+    }
+
+    function renderRecipes() {
+        const list = $('#recipesList');
+        if (!list) return;
+        if (state.recipes.length === 0) {
+            list.innerHTML = '<div class="empty-state"><p>Nenhuma receita cadastrada</p></div>';
+            return;
+        }
+        list.innerHTML = state.recipes.map((r, i) => {
+            const cost = calcRecipeCost(r);
+            const profit = r.price - cost;
+            const margin = r.price > 0 ? (profit / r.price * 100) : 0;
+            const color = profit >= 0 ? '#10B981' : '#EF4444';
+            return `<div class="entry-item" style="animation-delay:${i * 0.03}s">
+                <div class="entry-color" style="background:${color}"></div>
+                <div class="entry-info">
+                    <div class="entry-desc">${esc(r.name)}</div>
+                    <div class="entry-meta"><span>Venda: ${formatCurrency(r.price)}</span><span class="dot"></span><span>Custo: ${formatCurrency(cost)}</span><span class="dot"></span><span style="color:${color}">Margem: ${margin.toFixed(1)}%</span></div>
+                </div>
+                <span class="entry-value" style="color:${color}">${formatCurrency(profit)}</span>
+                <button class="entry-delete" onclick="GestaoStrada.deleteRecipe('${r.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+            </div>`;
+        }).join('');
+    }
+
+    function renderProfitTable() {
+        const tbody = $('#profitTableBody');
+        if (!tbody) return;
+        if (state.recipes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Cadastre receitas para ver a tabela de lucro</td></tr>';
+            return;
+        }
+        tbody.innerHTML = state.recipes.map(r => {
+            const cost = calcRecipeCost(r);
+            const profit = r.price - cost;
+            const margin = r.price > 0 ? (profit / r.price * 100) : 0;
+            const color = profit >= 0 ? '#10B981' : '#EF4444';
+            return `<tr><td>${esc(r.name)}</td><td>${formatCurrency(r.price)}</td><td>${formatCurrency(cost)}</td><td style="color:${color};font-weight:600;">${formatCurrency(profit)}</td><td style="color:${color};font-weight:600;">${margin.toFixed(1)}%</td></tr>`;
+        }).join('');
+    }
+
+    // ==========================================
+    // Employees
+    // ==========================================
+    let empSetup = false;
+    function setupEmployees() {
+        if (empSetup) return;
+        empSetup = true;
+        const form = $('#employeeForm');
+        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); addEmployee(); });
+    }
+
+    function addEmployee() {
+        const name = $('#empName').value.trim();
+        const role = $('#empRole').value.trim();
+        const username = $('#empUser').value.trim().toLowerCase();
+        const password = $('#empPass').value;
+        const allowedUnit = ($('#empUnit') || {}).value || 'all';
+        if (!name || !username || !password) { showToast('⚠ Preencha todos os campos obrigatórios'); return; }
+        const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+        if (employees.some(e => e.username === username) || VALID_USERS.some(u => u.username === username)) {
+            showToast('⚠ Usuário já existe'); return;
+        }
+        employees.push({ id: 'emp_' + Date.now(), name, role: role || 'Funcionário', username, password, allowedUnit });
+        localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+        renderEmployees(); $('#employeeForm').reset();
+        showToast('✅ Funcionário cadastrado!');
+    }
+
+    function deleteEmployee(id) {
+        showModal('Deseja excluir este funcionário?', () => {
+            let employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+            employees = employees.filter(e => e.id !== id);
+            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+            renderEmployees();
+            showToast('Funcionário excluído');
+        });
+    }
+
+    function renderEmployees() {
+        const list = $('#employeesList');
+        if (!list) return;
+        const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+        if (employees.length === 0) {
+            list.innerHTML = '<div class="empty-state"><p>Nenhum funcionário cadastrado</p></div>';
+            return;
+        }
+        list.innerHTML = employees.map((emp, i) => {
+            const unitLabel = emp.allowedUnit === 'bikeshop' ? 'BikeShop' : emp.allowedUnit === 'bikecafe' ? 'Bike Café' : 'Todas';
+            return `<div class="entry-item" style="animation-delay:${i * 0.03}s">
+            <div class="entry-color" style="background:#6C5CE7"></div>
+            <div class="entry-info">
+                <div class="entry-desc">${esc(emp.name)}</div>
+                <div class="entry-meta"><span>${esc(emp.role)}</span><span class="dot"></span><span>@${esc(emp.username)}</span><span class="dot"></span><span>🏢 ${unitLabel}</span></div>
+            </div>
+            <button class="entry-delete" onclick="GestaoStrada.deleteEmployee('${emp.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+        </div>`;
+        }).join('');
+    }
+
+    // ==========================================
+    // Updated renderAll
+    // ==========================================
+    function renderAllExtended() {
+        renderContacts();
+        renderCampaigns();
+        updateRecipientsSelect();
+        renderIngredients();
+        renderRecipes();
+        renderProfitTable();
+        renderEmployees();
+        renderCarnes();
+        renderCostEvolution();
+    }
+
+    // ==========================================
+    // Carnê Management (BikeShop)
+    // ==========================================
+    let carneSetup = false;
+    function setupCarne() {
+        if (carneSetup) return;
+        carneSetup = true;
+        const form = $('#carneForm');
+        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); addCarne(); });
+
+        // Currency masks for carnê
+        const carneValorInput = $('#carneValorParcela');
+        if (carneValorInput) carneValorInput.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, '');
+            if (!val) { e.target.value = ''; return; }
+            val = (parseInt(val) / 100).toFixed(2);
+            e.target.value = val.replace('.', ',');
+        });
+    }
+
+    function addCarne() {
+        const nome = $('#carneNome').value.trim();
+        const telefone = $('#carneTelefone').value.trim();
+        const endereco = $('#carneEndereco').value.trim();
+        const parcelas = parseInt($('#carneParcelas').value) || 0;
+        const valorParcela = parseCurrency($('#carneValorParcela').value);
+        const vencimento = $('#carneVencimento').value;
+
+        if (!nome || parcelas <= 0 || valorParcela <= 0 || !vencimento) {
+            showToast('⚠ Preencha todos os campos obrigatórios');
+            return;
+        }
+
+        // Generate installments
+        const installments = [];
+        const baseDate = new Date(vencimento + 'T12:00:00');
+        for (let i = 0; i < parcelas; i++) {
+            const dueDate = new Date(baseDate);
+            dueDate.setMonth(dueDate.getMonth() + i);
+            installments.push({
+                number: i + 1,
+                value: valorParcela,
+                dueDate: dueDate.toISOString().split('T')[0],
+                paid: false,
+                paidAt: null,
+            });
+        }
+
+        const carne = {
+            id: 'carne_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            nome, telefone, endereco,
+            totalParcelas: parcelas,
+            valorParcela,
+            valorTotal: parcelas * valorParcela,
+            installments,
+            createdAt: new Date().toISOString(),
+            createdBy: currentUser ? currentUser.name : 'Sistema',
+        };
+
+        state.carnes.unshift(carne);
+        saveState();
+        saveToSupabase();
+        renderCarnes();
+        $('#carneForm').reset();
+        showToast('✅ Carnê cadastrado com sucesso!');
+    }
+
+    function toggleParcelaPaid(carneId, parcelaNum) {
+        const carne = state.carnes.find(c => c.id === carneId);
+        if (!carne) return;
+        const parcela = carne.installments.find(p => p.number === parcelaNum);
+        if (!parcela) return;
+
+        if (parcela.paid) {
+            // Unmark as paid
+            parcela.paid = false;
+            parcela.paidAt = null;
+            parcela.paymentDate = null;
+            saveState(); saveToSupabase(); renderCarnes(); renderDashboard();
+            showToast('Parcela desmarcada');
+        } else {
+            // Ask for payment date
+            const paymentDateInput = prompt('Data do Pagamento (DD/MM/AAAA):', new Date().toLocaleDateString('pt-BR'));
+            if (paymentDateInput === null) return; // cancelled
+            let paymentDate = null;
+            if (paymentDateInput) {
+                // Parse DD/MM/YYYY
+                const parts = paymentDateInput.split('/');
+                if (parts.length === 3) {
+                    paymentDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                } else {
+                    paymentDate = new Date().toISOString().split('T')[0];
+                }
+            } else {
+                paymentDate = new Date().toISOString().split('T')[0];
+            }
+            parcela.paid = true;
+            parcela.paidAt = new Date().toISOString();
+            parcela.paymentDate = paymentDate;
+            saveState(); saveToSupabase(); renderCarnes(); renderDashboard();
+            showToast('✅ Parcela paga em ' + formatDate(paymentDate) + '!');
+        }
+    }
+
+    function deleteCarne(id) {
+        showModal('Deseja excluir este carnê e todas as suas parcelas?', () => {
+            state.carnes = state.carnes.filter(c => c.id !== id);
+            saveState();
+            saveToSupabase();
+            renderCarnes();
+            showToast('Carnê excluído');
+        });
+    }
+
+    function renderCarnes() {
+        const list = $('#carnesList');
+        if (!list) return;
+        if (!state.carnes || state.carnes.length === 0) {
+            list.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Nenhum carnê cadastrado</p></div>';
+            return;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Track which carnes are expanded
+        if (!window._carneExpanded) window._carneExpanded = {};
+
+        list.innerHTML = state.carnes.map((carne, i) => {
+            const paidCount = carne.installments.filter(p => p.paid).length;
+            const progress = (paidCount / carne.installments.length) * 100;
+            const isExpanded = !!window._carneExpanded[carne.id];
+            const allPaid = paidCount === carne.installments.length;
+
+            // Minimized view: name, phone, paid count, expand button
+            let parcelsHtml = '';
+            if (isExpanded) {
+                parcelsHtml = carne.installments.map(p => {
+                    const dueDate = new Date(p.dueDate + 'T12:00:00');
+                    const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                    let statusClass = 'parcela-pendente';
+                    let statusText = 'Pendente';
+                    if (p.paid) {
+                        statusClass = 'parcela-paga';
+                        statusText = 'Pago';
+                    } else if (diffDays < 0) {
+                        statusClass = 'parcela-vencida';
+                        statusText = 'Vencida';
+                    } else if (diffDays <= 3) {
+                        statusClass = 'parcela-proxima';
+                        statusText = `Vence em ${diffDays}d`;
+                    }
+                    const paidDateStr = p.paid && p.paymentDate ? ` ${formatDate(p.paymentDate)}` : '';
+                    return `<div class="parcela-item ${statusClass}">
+                        <div class="parcela-info">
+                            <span class="parcela-num">${p.number}ª</span>
+                            <span class="parcela-date">${formatDate(p.dueDate)}</span>
+                            <span class="parcela-valor">${formatCurrency(p.value)}</span>
+                            <span class="parcela-status-badge">${statusText}${paidDateStr}</span>
+                        </div>
+                        <button class="parcela-toggle" onclick="event.stopPropagation(); GestaoStrada.toggleParcelaPaid('${carne.id}', ${p.number})" title="${p.paid ? 'Desmarcar' : 'Registrar pagamento'}">
+                            ${p.paid ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'}
+                        </button>
+                    </div>`;
+                }).join('');
+            }
+
+            const statusIcon = allPaid ? '✅' : '';
+
+            return `<div class="carne-card ${isExpanded ? 'carne-expanded' : 'carne-collapsed'}" style="animation-delay:${i * 0.05}s">
+                <div class="carne-header-row" onclick="GestaoStrada.toggleCarne('${carne.id}')">
+                    <div class="carne-expand-icon">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            ${isExpanded ? '<polyline points="6 9 12 15 18 9"/>' : '<polyline points="9 6 15 12 9 18"/>'}
+                        </svg>
+                    </div>
+                    <div class="carne-collapsed-info">
+                        <span class="carne-collapsed-name">${statusIcon} ${esc(carne.nome)}</span>
+                        ${carne.telefone ? `<span class="carne-collapsed-phone">� ${esc(carne.telefone)}</span>` : ''}
+                    </div>
+                    <div class="carne-collapsed-stats">
+                        <span class="carne-collapsed-paid">${paidCount}/${carne.installments.length}</span>
+                        <span class="carne-collapsed-value">${formatCurrency(carne.valorTotal)}</span>
+                    </div>
+                    <div class="carne-collapsed-bar"><div class="carne-progress-fill" style="width:${progress}%"></div></div>
+                </div>
+                ${isExpanded ? `
+                <div class="carne-details">
+                    <div class="carne-header">
+                        <div class="carne-client">
+                            <div class="carne-meta">
+                                ${carne.telefone ? `<span>📱 ${esc(carne.telefone)}</span>` : ''}
+                                ${carne.endereco ? `<span class="dot"></span><span>📍 ${esc(carne.endereco)}</span>` : ''}
+                            </div>
+                        </div>
+                        <button class="entry-delete" onclick="GestaoStrada.deleteCarne('${carne.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                    </div>
+                    <div class="parcelas-list">${parcelsHtml}</div>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    function toggleCarne(carneId) {
+        if (!window._carneExpanded) window._carneExpanded = {};
+        window._carneExpanded[carneId] = !window._carneExpanded[carneId];
+        renderCarnes();
+    }
+
+    // ==========================================
+    // Contas a Pagar List (Dashboard)
+    // ==========================================
+    function renderContasPagarList() {
+        const container = $('#contasPagarList');
+        if (!container) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const bills = state.costs.filter(c => c.dueDate && !c.paid);
+        bills.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+        if (bills.length === 0) {
+            container.innerHTML = '<div class="empty-state" style="padding:1rem;"><p>Nenhum boleto pendente</p></div>';
+            return;
+        }
+
+        container.innerHTML = bills.slice(0, 8).map((bill, i) => {
+            const dueDate = new Date(bill.dueDate + 'T12:00:00');
+            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            let statusClass = 'bill-pendente';
+            let statusText = 'Pendente';
+            if (diffDays < 0) {
+                statusClass = 'bill-vencido';
+                statusText = 'Vencido';
+            } else if (diffDays <= 3) {
+                statusClass = 'bill-proximo';
+                statusText = `${diffDays}d`;
+            } else {
+                statusText = formatDate(bill.dueDate);
+            }
+
+            return `<div class="bill-item ${statusClass}" style="animation-delay:${i * 0.04}s">
+                <div class="bill-info">
+                    <span class="bill-desc">${esc(bill.description)}</span>
+                    <span class="bill-date">${statusText}</span>
+                </div>
+                <span class="bill-value">${formatCurrency(bill.value)}</span>
+                <button class="parcela-toggle" onclick="GestaoStrada.toggleCostPaid('${bill.id}')" title="Marcar como pago">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+            </div>`;
+        }).join('');
+
+        if (bills.length > 8) {
+            container.innerHTML += `<div style="text-align:center;font-size:0.75rem;color:var(--text-muted);padding:0.5rem;">+ ${bills.length - 8} boleto(s) adicionais</div>`;
+        }
+    }
+
+    function toggleCostPaid(costId) {
+        const cost = state.costs.find(c => c.id === costId);
+        if (!cost) return;
+        cost.paid = !cost.paid;
+        saveState();
+        saveToSupabase();
+        renderDashboard();
+        showToast(cost.paid ? '✅ Boleto marcado como pago!' : 'Boleto desmarcado');
+    }
+
+    // ==========================================
+    // Due Date Notifications
+    // ==========================================
+    function checkDueNotifications() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        let carneDueCount = 0;
+        let carneOverdueCount = 0;
+        let billDueCount = 0;
+        let billOverdueCount = 0;
+
+        // Check carnê installments
+        if (state.carnes && state.carnes.length > 0) {
+            state.carnes.forEach(carne => {
+                carne.installments.forEach(p => {
+                    if (p.paid) return;
+                    const dueDate = new Date(p.dueDate + 'T12:00:00');
+                    const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) carneOverdueCount++;
+                    else if (diffDays <= 3) carneDueCount++;
+                });
+            });
+        }
+
+        // Check bill due dates (contas a pagar)
+        state.costs.forEach(c => {
+            if (!c.dueDate || c.paid) return;
+            const dueDate = new Date(c.dueDate + 'T12:00:00');
+            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) billOverdueCount++;
+            else if (diffDays <= 3) billDueCount++;
+        });
+
+        // Update carnê badge on sidebar
+        const navCarne = $('#navCarne');
+        if (navCarne) {
+            let badge = navCarne.querySelector('.nav-badge');
+            const totalCarneAlerts = carneDueCount + carneOverdueCount;
+            if (totalCarneAlerts > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'nav-badge';
+                    navCarne.appendChild(badge);
+                }
+                badge.textContent = totalCarneAlerts;
+                badge.classList.toggle('badge-danger', carneOverdueCount > 0);
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
+        // Update dashboard badge
+        const navDash = $$('.sidebar-nav-item')[0];
+        if (navDash) {
+            let badge = navDash.querySelector('.nav-badge');
+            const totalBillAlerts = billDueCount + billOverdueCount;
+            if (totalBillAlerts > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'nav-badge';
+                    navDash.appendChild(badge);
+                }
+                badge.textContent = totalBillAlerts;
+                badge.classList.toggle('badge-danger', billOverdueCount > 0);
+            } else if (badge) {
+                badge.remove();
+            }
+        }
+
+        // Show notification toasts
+        const totalAlerts = carneDueCount + carneOverdueCount + billDueCount + billOverdueCount;
+        if (totalAlerts > 0) {
+            setTimeout(() => {
+                const parts = [];
+                if (carneOverdueCount > 0) parts.push(`${carneOverdueCount} parcela(s) de carnê vencida(s)`);
+                if (carneDueCount > 0) parts.push(`${carneDueCount} parcela(s) de carnê próxima(s)`);
+                if (billOverdueCount > 0) parts.push(`${billOverdueCount} boleto(s) vencido(s)`);
+                if (billDueCount > 0) parts.push(`${billDueCount} boleto(s) próximo(s)`);
+                showToast(`🚨 ${parts.join(', ')}!`);
+            }, 1500);
+        }
+    }
+
+    // ==========================================
+    // Cost Evolution
+    // ==========================================
+    function renderCostEvolution() {
+        const container = $('#evolutionContent');
+        if (!container) return;
+        if (state.costs.length === 0) {
+            container.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><p>Adicione custos para ver a evolução</p></div>';
+            return;
+        }
+
+        // Group costs by month
+        const monthMap = {};
+        state.costs.forEach(c => {
+            const d = new Date(c.date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!monthMap[key]) monthMap[key] = 0;
+            monthMap[key] += c.value;
+        });
+
+        const months = Object.keys(monthMap).sort();
+        const maxValue = Math.max(...months.map(m => monthMap[m]));
+
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+        let html = '<div class="evolution-chart">';
+        months.forEach((m, i) => {
+            const [year, month] = m.split('-');
+            const label = `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`;
+            const value = monthMap[m];
+            const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
+            let variation = '';
+            let variationClass = '';
+            if (i > 0) {
+                const prev = monthMap[months[i - 1]];
+                const pctChange = prev > 0 ? ((value - prev) / prev * 100) : 0;
+                if (pctChange > 0) {
+                    variation = `<span class="evolution-up">↑ +${pctChange.toFixed(1)}%</span>`;
+                    variationClass = 'evo-up';
+                } else if (pctChange < 0) {
+                    variation = `<span class="evolution-down">↓ ${pctChange.toFixed(1)}%</span>`;
+                    variationClass = 'evo-down';
+                } else {
+                    variation = `<span class="evolution-neutral">= 0%</span>`;
+                }
+            }
+
+            html += `<div class="evolution-row ${variationClass}" style="animation-delay:${i * 0.06}s">
+                <div class="evo-label">${label}</div>
+                <div class="evo-bar-wrapper">
+                    <div class="evo-bar" style="width:${pct}%"></div>
+                </div>
+                <div class="evo-value">${formatCurrency(value)}</div>
+                <div class="evo-variation">${variation}</div>
+            </div>`;
+        });
+        html += '</div>';
+
+        // Summary at top
+        const totalAll = months.reduce((s, m) => s + monthMap[m], 0);
+        const avgMonth = totalAll / months.length;
+        const lastMonth = months.length >= 1 ? monthMap[months[months.length - 1]] : 0;
+        const prevMonth = months.length >= 2 ? monthMap[months[months.length - 2]] : 0;
+        const trend = prevMonth > 0 ? ((lastMonth - prevMonth) / prevMonth * 100) : 0;
+        const trendColor = trend > 0 ? '#EF4444' : trend < 0 ? '#10B981' : 'var(--text-muted)';
+        const trendIcon = trend > 0 ? '📈' : trend < 0 ? '📉' : '➡️';
+
+        const summaryHtml = `<div class="evolution-summary">
+            <div class="evo-summary-card">
+                <span class="evo-summary-label">Média Mensal</span>
+                <span class="evo-summary-value">${formatCurrency(avgMonth)}</span>
+            </div>
+            <div class="evo-summary-card">
+                <span class="evo-summary-label">Último Mês</span>
+                <span class="evo-summary-value">${formatCurrency(lastMonth)}</span>
+            </div>
+            <div class="evo-summary-card">
+                <span class="evo-summary-label">Tendência</span>
+                <span class="evo-summary-value" style="color:${trendColor}">${trendIcon} ${trend > 0 ? '+' : ''}${trend.toFixed(1)}%</span>
+            </div>
+            <div class="evo-summary-card">
+                <span class="evo-summary-label">Total Acumulado</span>
+                <span class="evo-summary-value">${formatCurrency(totalAll)}</span>
+            </div>
+        </div>`;
+
+        container.innerHTML = summaryHtml + html;
+    }
+
+    // ==========================================
+    // Public API
+    // ==========================================
+    window.GestaoStrada = {
+        login, logout, selectUnit, backToLogin,
+        deleteCost, deleteCategory, deleteContact, deleteEmployee,
+        deleteIngredient, deleteRecipe, switchCalcTab,
+        deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
+    };
+
+    // ==========================================
+    // Boot
+    // ==========================================
+    function boot() {
+        cacheEls();
+        setupAuth();
+        checkAutoLogin();
+    }
+
+    // Extend showApp to setup new features
+    const _origShowApp = showApp;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
