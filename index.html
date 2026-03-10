@@ -230,6 +230,15 @@
                     </svg>
                     <span>Evolução</span>
                 </button>
+                <button class="sidebar-nav-item" data-panel="10" id="navAI">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                        <path d="M19 10a7 7 0 0 1-14 0" />
+                        <line x1="12" y1="17" x2="12" y2="22" />
+                    </svg>
+                    <span>IA Assistente</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -871,6 +880,40 @@
                     </div>
                     <div class="panel-content">
                         <div id="evolutionContent"></div>
+                    </div>
+                </section>
+
+                <!-- Panel 10: AI Assistant -->
+                <section class="panel" id="panelAI">
+                    <div class="panel-header">
+                        <h2>🤖 IA Assistente</h2>
+                        <p class="panel-subtitle">Análise inteligente dos seus custos</p>
+                    </div>
+                    <div class="panel-content">
+                        <div class="ai-container">
+                            <div class="ai-chat-area" id="aiChatArea">
+                                <div class="ai-msg ai-bot">
+                                    <span>🤖 Assistente</span>
+                                    <p>Olá! Sou seu assistente de gestão financeira. Pergunte sobre:<br>
+                                        • <strong>"resumo"</strong> — visão geral<br>
+                                        • <strong>"categorias"</strong> — análise por categoria<br>
+                                        • <strong>"tendência"</strong> — evolução mensal<br>
+                                        • <strong>"dicas"</strong> — sugestões de economia<br>
+                                        • <strong>"carnê"</strong> — contas a receber</p>
+                                </div>
+                            </div>
+                            <div class="ai-input-bar">
+                                <input type="text" id="aiInput" placeholder="Pergunte algo sobre seus custos..."
+                                    onkeydown="if(event.key==='Enter')GestaoStrada.askAI()">
+                                <button class="btn-primary ai-send-btn" onclick="GestaoStrada.askAI()">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <line x1="22" y1="2" x2="11" y2="13" />
+                                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </section>
 

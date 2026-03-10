@@ -1624,16 +1624,24 @@
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Track which carnes are expanded
         if (!window._carneExpanded) window._carneExpanded = {};
 
-        list.innerHTML = state.carnes.map((carne, i) => {
+        // Separate active and paid carnês
+        const activeCarnes = state.carnes.filter(c => {
+            const paidCount = c.installments.filter(p => p.paid).length;
+            return paidCount < c.installments.length;
+        });
+        const paidCarnes = state.carnes.filter(c => {
+            const paidCount = c.installments.filter(p => p.paid).length;
+            return paidCount === c.installments.length;
+        });
+
+        function buildCarneCard(carne, i) {
             const paidCount = carne.installments.filter(p => p.paid).length;
             const progress = (paidCount / carne.installments.length) * 100;
             const isExpanded = !!window._carneExpanded[carne.id];
             const allPaid = paidCount === carne.installments.length;
 
-            // Minimized view: name, phone, paid count, expand button
             let parcelsHtml = '';
             if (isExpanded) {
                 parcelsHtml = carne.installments.map(p => {
@@ -1677,13 +1685,15 @@
                     </div>
                     <div class="carne-collapsed-info">
                         <span class="carne-collapsed-name">${statusIcon} ${esc(carne.nome)}</span>
-                        ${carne.telefone ? `<span class="carne-collapsed-phone">� ${esc(carne.telefone)}</span>` : ''}
+                        ${carne.telefone ? `<span class="carne-collapsed-phone">📱 ${esc(carne.telefone)}</span>` : ''}
                     </div>
                     <div class="carne-collapsed-stats">
                         <span class="carne-collapsed-paid">${paidCount}/${carne.installments.length}</span>
                         <span class="carne-collapsed-value">${formatCurrency(carne.valorTotal)}</span>
                     </div>
-                    <div class="carne-collapsed-bar"><div class="carne-progress-fill" style="width:${progress}%"></div></div>
+                    <button class="carne-delete-btn" onclick="event.stopPropagation(); GestaoStrada.deleteCarne('${carne.id}')" title="Excluir carnê">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
                 </div>
                 ${isExpanded ? `
                 <div class="carne-details">
@@ -1694,12 +1704,46 @@
                                 ${carne.endereco ? `<span class="dot"></span><span>📍 ${esc(carne.endereco)}</span>` : ''}
                             </div>
                         </div>
-                        <button class="entry-delete" onclick="GestaoStrada.deleteCarne('${carne.id}')" title="Excluir"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                     </div>
                     <div class="parcelas-list">${parcelsHtml}</div>
                 </div>` : ''}
             </div>`;
-        }).join('');
+        }
+
+        let html = '';
+
+        // Active carnês
+        if (activeCarnes.length > 0) {
+            html += '<div class="carne-section-label">📋 Carnês Ativos</div>';
+            html += activeCarnes.map((c, i) => buildCarneCard(c, i)).join('');
+        }
+
+        // Paid carnês history
+        if (paidCarnes.length > 0) {
+            const totalRecebido = paidCarnes.reduce((s, c) => s + c.valorTotal, 0);
+            const avgPerCarne = totalRecebido / paidCarnes.length;
+
+            html += `<div class="carne-history-section">
+                <div class="carne-section-label">✅ Histórico — Carnês Quitados</div>
+                <div class="carne-history-dashboard">
+                    <div class="carne-hist-card">
+                        <span class="carne-hist-label">Total Recebido</span>
+                        <span class="carne-hist-value" style="color:#10B981">${formatCurrency(totalRecebido)}</span>
+                    </div>
+                    <div class="carne-hist-card">
+                        <span class="carne-hist-label">Carnês Quitados</span>
+                        <span class="carne-hist-value">${paidCarnes.length}</span>
+                    </div>
+                    <div class="carne-hist-card">
+                        <span class="carne-hist-label">Média por Carnê</span>
+                        <span class="carne-hist-value">${formatCurrency(avgPerCarne)}</span>
+                    </div>
+                </div>
+                ${paidCarnes.map((c, i) => buildCarneCard(c, i)).join('')}
+            </div>`;
+        }
+
+        list.innerHTML = html;
     }
 
     function toggleCarne(carneId) {
@@ -1862,21 +1906,45 @@
             return;
         }
 
-        // Group costs by month
         const monthMap = {};
+        const catMap = {}; // category per month
         state.costs.forEach(c => {
             const d = new Date(c.date);
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
             if (!monthMap[key]) monthMap[key] = 0;
             monthMap[key] += c.value;
+            if (!catMap[key]) catMap[key] = {};
+            const cat = state.categories.find(cat => cat.id === c.categoryId);
+            const catName = cat ? cat.name : 'Outros';
+            catMap[key][catName] = (catMap[key][catName] || 0) + c.value;
         });
 
         const months = Object.keys(monthMap).sort();
         const maxValue = Math.max(...months.map(m => monthMap[m]));
-
         const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const brandColors = ['#F5A623', '#6C5CE7', '#10B981', '#EF4444', '#3B82F6', '#EC4899', '#F59E0B', '#8B5CF6'];
 
-        let html = '<div class="evolution-chart">';
+        // Summary cards
+        const totalAll = months.reduce((s, m) => s + monthMap[m], 0);
+        const avgMonth = totalAll / months.length;
+        const lastMonth = months.length >= 1 ? monthMap[months[months.length - 1]] : 0;
+        const prevMonthVal = months.length >= 2 ? monthMap[months[months.length - 2]] : 0;
+        const trend = prevMonthVal > 0 ? ((lastMonth - prevMonthVal) / prevMonthVal * 100) : 0;
+        const trendColor = trend > 0 ? '#EF4444' : trend < 0 ? '#10B981' : 'var(--text-muted)';
+        const trendIcon = trend > 0 ? '📈' : trend < 0 ? '📉' : '➡️';
+
+        let summaryHtml = `<div class="evolution-summary">
+            <div class="evo-summary-card"><span class="evo-summary-label">Média Mensal</span><span class="evo-summary-value">${formatCurrency(avgMonth)}</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Último Mês</span><span class="evo-summary-value">${formatCurrency(lastMonth)}</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Tendência</span><span class="evo-summary-value" style="color:${trendColor}">${trendIcon} ${trend > 0 ? '+' : ''}${trend.toFixed(1)}%</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Total Acumulado</span><span class="evo-summary-value">${formatCurrency(totalAll)}</span></div>
+        </div>`;
+
+        // Canvas chart
+        let chartHtml = `<div class="evo-canvas-wrapper"><canvas id="evoCanvas" width="700" height="220"></canvas></div>`;
+
+        // Bar rows
+        let barsHtml = '<div class="evolution-chart">';
         months.forEach((m, i) => {
             const [year, month] = m.split('-');
             const label = `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`;
@@ -1887,57 +1955,225 @@
             if (i > 0) {
                 const prev = monthMap[months[i - 1]];
                 const pctChange = prev > 0 ? ((value - prev) / prev * 100) : 0;
-                if (pctChange > 0) {
-                    variation = `<span class="evolution-up">↑ +${pctChange.toFixed(1)}%</span>`;
-                    variationClass = 'evo-up';
-                } else if (pctChange < 0) {
-                    variation = `<span class="evolution-down">↓ ${pctChange.toFixed(1)}%</span>`;
-                    variationClass = 'evo-down';
-                } else {
-                    variation = `<span class="evolution-neutral">= 0%</span>`;
-                }
+                if (pctChange > 0) { variation = `<span class="evolution-up">↑ +${pctChange.toFixed(1)}%</span>`; variationClass = 'evo-up'; }
+                else if (pctChange < 0) { variation = `<span class="evolution-down">↓ ${pctChange.toFixed(1)}%</span>`; variationClass = 'evo-down'; }
+                else { variation = `<span class="evolution-neutral">= 0%</span>`; }
             }
+            // Category mini bars
+            const cats = catMap[m] || {};
+            const catEntries = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+            const catBars = catEntries.slice(0, 3).map((ce, ci) => {
+                const catPct = value > 0 ? (ce[1] / value * 100) : 0;
+                return `<div class="evo-cat-chip" style="background:${brandColors[ci % brandColors.length]};width:${Math.max(catPct, 8)}%" title="${ce[0]}: ${formatCurrency(ce[1])}">${ce[0].substring(0, 8)}</div>`;
+            }).join('');
 
-            html += `<div class="evolution-row ${variationClass}" style="animation-delay:${i * 0.06}s">
+            barsHtml += `<div class="evolution-row ${variationClass}" style="animation-delay:${i * 0.06}s">
                 <div class="evo-label">${label}</div>
-                <div class="evo-bar-wrapper">
-                    <div class="evo-bar" style="width:${pct}%"></div>
-                </div>
+                <div class="evo-bar-wrapper"><div class="evo-bar" style="width:${pct}%"></div></div>
                 <div class="evo-value">${formatCurrency(value)}</div>
                 <div class="evo-variation">${variation}</div>
-            </div>`;
+            </div>
+            <div class="evo-cat-row">${catBars}</div>`;
         });
-        html += '</div>';
+        barsHtml += '</div>';
 
-        // Summary at top
-        const totalAll = months.reduce((s, m) => s + monthMap[m], 0);
-        const avgMonth = totalAll / months.length;
-        const lastMonth = months.length >= 1 ? monthMap[months[months.length - 1]] : 0;
-        const prevMonth = months.length >= 2 ? monthMap[months[months.length - 2]] : 0;
-        const trend = prevMonth > 0 ? ((lastMonth - prevMonth) / prevMonth * 100) : 0;
-        const trendColor = trend > 0 ? '#EF4444' : trend < 0 ? '#10B981' : 'var(--text-muted)';
-        const trendIcon = trend > 0 ? '📈' : trend < 0 ? '📉' : '➡️';
+        container.innerHTML = summaryHtml + chartHtml + barsHtml;
 
-        const summaryHtml = `<div class="evolution-summary">
-            <div class="evo-summary-card">
-                <span class="evo-summary-label">Média Mensal</span>
-                <span class="evo-summary-value">${formatCurrency(avgMonth)}</span>
-            </div>
-            <div class="evo-summary-card">
-                <span class="evo-summary-label">Último Mês</span>
-                <span class="evo-summary-value">${formatCurrency(lastMonth)}</span>
-            </div>
-            <div class="evo-summary-card">
-                <span class="evo-summary-label">Tendência</span>
-                <span class="evo-summary-value" style="color:${trendColor}">${trendIcon} ${trend > 0 ? '+' : ''}${trend.toFixed(1)}%</span>
-            </div>
-            <div class="evo-summary-card">
-                <span class="evo-summary-label">Total Acumulado</span>
-                <span class="evo-summary-value">${formatCurrency(totalAll)}</span>
-            </div>
-        </div>`;
+        // Draw canvas chart
+        requestAnimationFrame(() => {
+            const canvas = document.getElementById('evoCanvas');
+            if (!canvas || months.length < 2) return;
+            const ctx = canvas.getContext('2d');
+            const W = canvas.width;
+            const H = canvas.height;
+            const padding = { top: 20, right: 20, bottom: 30, left: 60 };
+            const chartW = W - padding.left - padding.right;
+            const chartH = H - padding.top - padding.bottom;
 
-        container.innerHTML = summaryHtml + html;
+            ctx.clearRect(0, 0, W, H);
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding.top + (chartH / 4) * i;
+                ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(W - padding.right, y); ctx.stroke();
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.font = '10px Inter';
+                ctx.textAlign = 'right';
+                ctx.fillText(formatCurrency(maxValue * (1 - i / 4)), padding.left - 5, y + 3);
+            }
+
+            // Data points
+            const points = months.map((m, i) => ({
+                x: padding.left + (i / (months.length - 1)) * chartW,
+                y: padding.top + chartH - (monthMap[m] / maxValue) * chartH
+            }));
+
+            // Gradient fill
+            const gradient = ctx.createLinearGradient(0, padding.top, 0, H - padding.bottom);
+            gradient.addColorStop(0, 'rgba(245, 166, 35, 0.25)');
+            gradient.addColorStop(1, 'rgba(245, 166, 35, 0)');
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, H - padding.bottom);
+            points.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(points[points.length - 1].x, H - padding.bottom);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#F5A623';
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+            ctx.stroke();
+
+            // Dots + labels
+            points.forEach((p, i) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#F5A623';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                const [, month] = months[i].split('-');
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = '10px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(monthNames[parseInt(month) - 1], p.x, H - 8);
+            });
+        });
+    }
+
+    // ==========================================
+    // AI Assistant
+    // ==========================================
+    function askAI() {
+        const input = $('#aiInput');
+        if (!input) return;
+        const question = input.value.trim();
+        if (!question) return;
+        input.value = '';
+
+        const chatArea = $('#aiChatArea');
+        if (!chatArea) return;
+
+        // Add user message
+        chatArea.innerHTML += `<div class="ai-msg ai-user"><span>Você</span><p>${esc(question)}</p></div>`;
+
+        // Generate AI response based on data analysis
+        const response = generateAIResponse(question);
+        chatArea.innerHTML += `<div class="ai-msg ai-bot"><span>🤖 Assistente</span><p>${response}</p></div>`;
+        chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function generateAIResponse(question) {
+        const q = question.toLowerCase();
+        const total = state.costs.reduce((s, c) => s + c.value, 0);
+        const now = new Date();
+        const monthCosts = state.costs.filter(c => {
+            const d = new Date(c.date);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        const monthTotal = monthCosts.reduce((s, c) => s + c.value, 0);
+
+        // Category analysis
+        const catTotals = {};
+        state.costs.forEach(c => {
+            const cat = state.categories.find(cat => cat.id === c.categoryId);
+            const name = cat ? cat.name : 'Outros';
+            catTotals[name] = (catTotals[name] || 0) + c.value;
+        });
+        const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+
+        // Monthly analysis
+        const monthMap = {};
+        state.costs.forEach(c => {
+            const d = new Date(c.date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            monthMap[key] = (monthMap[key] || 0) + c.value;
+        });
+        const monthKeys = Object.keys(monthMap).sort();
+
+        // Carnê analysis
+        const totalReceber = (state.carnes || []).reduce((s, c) => s + c.installments.filter(p => !p.paid).reduce((s2, p) => s2 + p.value, 0), 0);
+
+        if (q.includes('resum') || q.includes('geral') || q.includes('visão')) {
+            return `📊 <strong>Resumo Geral:</strong><br>
+                • Total acumulado: <strong>${formatCurrency(total)}</strong><br>
+                • Este mês: <strong>${formatCurrency(monthTotal)}</strong> (${monthCosts.length} lançamentos)<br>
+                • ${state.costs.length} custos registrados em ${monthKeys.length} mês(es)<br>
+                • Contas a receber: <strong>${formatCurrency(totalReceber)}</strong><br>
+                ${topCats.length > 0 ? `• Maior categoria: <strong>${topCats[0][0]}</strong> (${formatCurrency(topCats[0][1])})` : ''}`;
+        }
+
+        if (q.includes('categor') || q.includes('maior') || q.includes('gasta')) {
+            if (topCats.length === 0) return 'Nenhum custo registrado ainda para analisar.';
+            let resp = '🏷️ <strong>Análise por Categoria:</strong><br>';
+            topCats.slice(0, 5).forEach((c, i) => {
+                const pct = total > 0 ? (c[1] / total * 100).toFixed(1) : 0;
+                resp += `${i + 1}. <strong>${c[0]}</strong>: ${formatCurrency(c[1])} (${pct}%)<br>`;
+            });
+            if (topCats.length > 0) {
+                resp += `<br>💡 <em>A categoria "${topCats[0][0]}" representa a maior parte dos custos. Considere negociar melhores preços ou encontrar alternativas nessa área.</em>`;
+            }
+            return resp;
+        }
+
+        if (q.includes('tendên') || q.includes('evolu') || q.includes('mês') || q.includes('mensal')) {
+            if (monthKeys.length < 2) return 'Preciso de pelo menos 2 meses de dados para analisar tendências.';
+            const last = monthMap[monthKeys[monthKeys.length - 1]];
+            const prev = monthMap[monthKeys[monthKeys.length - 2]];
+            const change = prev > 0 ? ((last - prev) / prev * 100) : 0;
+            const avgMonthly = total / monthKeys.length;
+            return `📈 <strong>Análise de Tendência:</strong><br>
+                • Último mês: ${formatCurrency(last)}<br>
+                • Mês anterior: ${formatCurrency(prev)}<br>
+                • Variação: <strong style="color:${change > 0 ? '#EF4444' : '#10B981'}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</strong><br>
+                • Média mensal: ${formatCurrency(avgMonthly)}<br>
+                ${change > 5 ? '<br>⚠️ <em>Os custos estão subindo! Revise os gastos recentes para identificar onde economizar.</em>' : change < -5 ? '<br>✅ <em>Bom trabalho! Os custos estão diminuindo.</em>' : '<br>➡️ <em>Os custos estão estáveis.</em>'}`;
+        }
+
+        if (q.includes('econom') || q.includes('dica') || q.includes('reduzir') || q.includes('sugestão') || q.includes('ajuda')) {
+            let resp = '💡 <strong>Dicas para Economia:</strong><br>';
+            if (topCats.length > 0) {
+                resp += `1. <strong>${topCats[0][0]}</strong> é sua maior despesa (${formatCurrency(topCats[0][1])}). Pesquise fornecedores alternativos.<br>`;
+            }
+            if (monthKeys.length >= 2) {
+                const vals = monthKeys.map(k => monthMap[k]);
+                const maxMonth = Math.max(...vals);
+                const maxIdx = vals.indexOf(maxMonth);
+                resp += `2. O mês mais caro foi ${monthKeys[maxIdx]} (${formatCurrency(maxMonth)}). Analise o que aconteceu.<br>`;
+            }
+            resp += `3. Defina um orçamento mensal e monitore semanalmente.<br>`;
+            resp += `4. Negocie compras recorrentes em volume para obter descontos.<br>`;
+            if (totalReceber > 0) {
+                resp += `5. Você tem ${formatCurrency(totalReceber)} a receber em carnês. Cobre os inadimplentes.`;
+            }
+            return resp;
+        }
+
+        if (q.includes('carn') || q.includes('receber') || q.includes('devedor')) {
+            const total_carnes = (state.carnes || []).length;
+            const quitados = (state.carnes || []).filter(c => c.installments.every(p => p.paid)).length;
+            return `📋 <strong>Análise de Carnês:</strong><br>
+                • Total de carnês: <strong>${total_carnes}</strong><br>
+                • Quitados: <strong>${quitados}</strong><br>
+                • Pendentes: <strong>${total_carnes - quitados}</strong><br>
+                • A receber: <strong>${formatCurrency(totalReceber)}</strong>`;
+        }
+
+        return `Posso ajudar com:<br>
+            • <strong>"resumo"</strong> — visão geral dos custos<br>
+            • <strong>"categorias"</strong> — análise por categoria<br>
+            • <strong>"tendência"</strong> — evolução mensal<br>
+            • <strong>"dicas"</strong> — sugestões de economia<br>
+            • <strong>"carnê"</strong> — análise de contas a receber<br>
+            <br>Faça uma pergunta sobre seus dados financeiros!`;
     }
 
     // ==========================================
@@ -1948,6 +2184,7 @@
         deleteCost, deleteCategory, deleteContact, deleteEmployee,
         deleteIngredient, deleteRecipe, switchCalcTab,
         deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
+        askAI,
     };
 
     // ==========================================
