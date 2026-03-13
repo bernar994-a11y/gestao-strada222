@@ -20,7 +20,7 @@
     // Supabase Integration
     // ==========================================
     const SUPABASE_URL = 'https://ruknpuaukutpxpcriuex.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_s8RlVo0V54IBl4lHvi9RyA_ZVM6vFr2'; // Aguardando nova chave do usuário
+    const SUPABASE_ANON_KEY = 'sb_publishable_fbcn6PhYrDEWj8HYhc9QRg_8iESPwm6';
     let supabase = null;
 
     try {
