@@ -19,8 +19,8 @@
     // ==========================================
     // Supabase Integration
     // ==========================================
-    const SUPABASE_URL = 'https://xvuspozypouhrjhlgbqv.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_s8RlVo0V54IBl4lHvi9RyA_ZVM6vFr2';
+    const SUPABASE_URL = 'https://ruknpuaukutpxpcriuex.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_s8RlVo0V54IBl4lHvi9RyA_ZVM6vFr2'; // Aguardando nova chave do usuário
     let supabase = null;
 
     try {
@@ -408,6 +408,17 @@
         renderAll();
         renderAllExtended();
         checkDueNotifications();
+        registerServiceWorker();
+    }
+
+    function registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('✅ Service Worker registrado', reg))
+                    .catch(err => console.warn('⚠ Erro ao registrar Service Worker', err));
+            });
+        }
     }
 
     function checkAutoLogin() {
