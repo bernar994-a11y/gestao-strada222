@@ -1103,11 +1103,11 @@
         const row = {};
         columns.forEach(col => {
             switch (col) {
-                case 'description': row[COLUMN_LABELS[col]] = cost.description; break;
+                case 'description': row[COLUMN_LABELS[col]] = cost.desc || ''; break;
                 case 'value': row[COLUMN_LABELS[col]] = cost.value; break;
                 case 'date': row[COLUMN_LABELS[col]] = formatDate(cost.date); break;
                 case 'category': row[COLUMN_LABELS[col]] = cat ? cat.name : 'Sem categoria'; break;
-                case 'center': row[COLUMN_LABELS[col]] = cost.costCenter || ''; break;
+                case 'center': row[COLUMN_LABELS[col]] = cost.center || ''; break;
                 case 'notes': row[COLUMN_LABELS[col]] = cost.notes || ''; break;
                 case 'kg': row[COLUMN_LABELS[col]] = cost.kg != null ? cost.kg : ''; break;
             }
