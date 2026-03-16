@@ -200,6 +200,8 @@
         localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(state.ingredients));
         localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(state.recipes));
         localStorage.setItem(storageKey(STORAGE_KEYS.CARNES_PREFIX), JSON.stringify(state.carnes));
+        // Sincronizar com Supabase
+        if (typeof saveToSupabase === 'function') saveToSupabase();
     }
 
     // ==========================================
@@ -320,7 +322,7 @@
         els.unitScreen.querySelector('.login-container').style.animation = 'loginFadeIn 0.5s ease-out';
     }
 
-    function selectUnit(unit) {
+    async function selectUnit(unit) {
         // Check if employee has unit restriction
         if (currentUser && currentUser.allowedUnit && currentUser.allowedUnit !== 'all' && currentUser.allowedUnit !== unit) {
             showToast('⚠ Você não tem acesso a esta unidade');
@@ -329,6 +331,7 @@
         state.currentUnit = unit;
         localStorage.setItem(STORAGE_KEYS.LAST_UNIT, unit);
         loadState();
+        await loadFromSupabase();
         els.unitScreen.style.display = 'none';
         showApp();
     }
@@ -594,6 +597,7 @@
 
         state.costs.unshift(cost);
         saveState();
+        saveToSupabase();
         renderAll();
 
         els.costForm.reset();
@@ -618,6 +622,7 @@
             color: color,
         });
         saveState();
+        saveToSupabase();
         renderAll();
         els.catName.value = '';
         showToast('✅ Categoria adicionada!');
@@ -658,6 +663,7 @@
         showModal('Deseja realmente excluir este lançamento?', () => {
             state.costs = state.costs.filter(c => c.id !== id);
             saveState();
+            saveToSupabase();
             renderAll();
             showToast('Lançamento excluído');
         });
@@ -671,6 +677,7 @@
         showModal(msg, () => {
             state.categories = state.categories.filter(c => c.id !== id);
             saveState();
+            saveToSupabase();
             renderAll();
             showToast('Categoria excluída');
         });
@@ -1460,6 +1467,7 @@
         }
         employees.push({ id: 'emp_' + Date.now(), name, role: role || 'Funcionário', username, password, allowedUnit });
         localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+        saveEmployeesToSupabase();
         renderEmployees(); $('#employeeForm').reset();
         showToast('✅ Funcionário cadastrado!');
     }
@@ -1469,6 +1477,7 @@
             let employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
             employees = employees.filter(e => e.id !== id);
             localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+            saveEmployeesToSupabase();
             renderEmployees();
             showToast('Funcionário excluído');
         });
