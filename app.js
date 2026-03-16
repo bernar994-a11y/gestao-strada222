@@ -99,6 +99,24 @@
             console.warn('Supabase employees sync error:', e);
         }
     }
+    
+    async function loadEmployeesFromSupabase() {
+        if (!supabase) return false;
+        try {
+            const { data, error } = await supabase
+                .from('app_data')
+                .select('*')
+                .eq('unit_id', 'employees')
+                .single();
+            if (error || !data) return false;
+            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, data.costs || '[]');
+            console.log('✅ Funcionários carregados do Supabase');
+            return true;
+        } catch (e) {
+            console.warn('Supabase load employees error:', e);
+            return false;
+        }
+    }
 
     // ==========================================
     // Configuration per Business Unit
@@ -332,6 +350,7 @@
         localStorage.setItem(STORAGE_KEYS.LAST_UNIT, unit);
         loadState();
         await loadFromSupabase();
+        if (typeof loadEmployeesFromSupabase === 'function') await loadEmployeesFromSupabase();
         els.unitScreen.style.display = 'none';
         showApp();
     }
