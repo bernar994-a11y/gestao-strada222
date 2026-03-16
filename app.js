@@ -2229,8 +2229,9 @@
     // ==========================================
     // Boot
     // ==========================================
-    function boot() {
+    async function boot() {
         cacheEls();
+        if (typeof loadEmployeesFromSupabase === 'function') await loadEmployeesFromSupabase();
         setupAuth();
         checkAutoLogin();
     }
