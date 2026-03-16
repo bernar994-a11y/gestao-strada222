@@ -32,57 +32,163 @@
         console.warn('⚠ Supabase não disponível, usando localStorage', e);
     }
 
-    async function saveToSupabase() {
+    async function saveCostToSupabase(cost) {
         if (!supabase || !state.currentUnit) return;
         try {
-            const payload = {
-                unit_id: state.currentUnit,
-                costs: JSON.stringify(state.costs),
-                categories: JSON.stringify(state.categories),
-                contacts: JSON.stringify(state.contacts),
-                campaigns: JSON.stringify(state.campaigns),
-                ingredients: JSON.stringify(state.ingredients),
-                recipes: JSON.stringify(state.recipes),
-                carnes: JSON.stringify(state.carnes || []),
-                updated_at: new Date().toISOString(),
-                updated_by: currentUser ? currentUser.name : 'Sistema',
-            };
             const { error } = await supabase
-                .from('app_data')
-                .upsert(payload, { onConflict: 'unit_id' });
+                .from('custos')
+                .upsert({
+                    id: cost.id,
+                    description: cost.desc,
+                    value: cost.value,
+                    date: cost.date,
+                    category_id: cost.categoryId,
+                    cost_center: cost.center,
+                    notes: cost.notes,
+                    kg: cost.kg || 0,
+                    due_date: cost.dueDate || null,
+                    paid: cost.paid,
+                    unit_id: state.currentUnit
+                }, { onConflict: 'id' });
             if (error) console.warn('Supabase save error:', error.message);
         } catch (e) {
             console.warn('Supabase sync error:', e);
         }
     }
 
+    async function deleteCostSupabase(id) {
+        if (!supabase) return;
+        try {
+            await supabase.from('custos').delete().eq('id', id);
+        } catch (e) { }
+    }
+
+    async function saveCategoryToSupabase(cat) {
+        if (!supabase || !state.currentUnit) return;
+        try {
+            const { error } = await supabase
+                .from('categorias')
+                .upsert({
+                    id: cat.id,
+                    name: cat.name,
+                    color: cat.color,
+                    unit_id: state.currentUnit
+                }, { onConflict: 'id' });
+        } catch (e) { }
+    }
+
+    async function deleteCategorySupabase(id) {
+        if (!supabase) return;
+        try {
+            await supabase.from('categorias').delete().eq('id', id);
+        } catch (e) { }
+    }
+
+    async function saveCarneToSupabase(carne) {
+        if (!supabase || !state.currentUnit) return;
+        try {
+            await supabase.from('carnes').upsert({
+                id: carne.id,
+                name: carne.nome,
+                phone: carne.telefone,
+                address: carne.endereco,
+                unit_id: state.currentUnit
+            }, { onConflict: 'id' });
+
+            if (carne.installments && carne.installments.length > 0) {
+                const payload = carne.installments.map(p => ({
+                    id: p.id || ('p_' + carne.id + '_' + p.number),
+                    carne_id: carne.id,
+                    installment_number: p.number,
+                    value: p.value,
+                    due_date: p.dueDate,
+                    paid: p.paid,
+                    payment_date: p.paymentDate || null
+                }));
+                await supabase.from('carnes_parcelas').upsert(payload, { onConflict: 'id' });
+            }
+        } catch (e) { }
+    }
+
+    async function deleteCarneSupabase(id) {
+        if (!supabase) return;
+        try {
+            await supabase.from('carnes').delete().eq('id', id);
+        } catch (e) { }
+    }
+
     async function loadFromSupabase() {
         if (!supabase || !state.currentUnit) return false;
         try {
-            const { data, error } = await supabase
-                .from('app_data')
+            // 1. Carregar Custos
+            const { data: custos, error: errCosts } = await supabase
+                .from('custos')
                 .select('*')
-                .eq('unit_id', state.currentUnit)
-                .single();
-            if (error || !data) return false;
-            state.costs = JSON.parse(data.costs || '[]');
-            state.categories = JSON.parse(data.categories || '[]');
-            state.contacts = JSON.parse(data.contacts || '[]');
-            state.campaigns = JSON.parse(data.campaigns || '[]');
-            state.ingredients = JSON.parse(data.ingredients || '[]');
-            state.recipes = JSON.parse(data.recipes || '[]');
-            state.carnes = JSON.parse(data.carnes || '[]');
-            // Also update localStorage
-            localStorage.setItem(storageKey(STORAGE_KEYS.COSTS_PREFIX), data.costs || '[]');
-            localStorage.setItem(storageKey(STORAGE_KEYS.CATEGORIES_PREFIX), data.categories || '[]');
-            localStorage.setItem(storageKey(STORAGE_KEYS.CONTACTS_PREFIX), data.contacts || '[]');
-            localStorage.setItem(storageKey(STORAGE_KEYS.CAMPAIGNS_PREFIX), data.campaigns || '[]');
-            localStorage.setItem(STORAGE_KEYS.INGREDIENTS, data.ingredients || '[]');
-            localStorage.setItem(STORAGE_KEYS.RECIPES, data.recipes || '[]');
-            console.log('✅ Dados carregados do Supabase');
+                .eq('unit_id', state.currentUnit);
+
+            // 2. Carregar Categorias
+            const { data: categorias, error: errCats } = await supabase
+                .from('categorias')
+                .select('*')
+                .eq('unit_id', state.currentUnit);
+
+            // 3. Carregar Carnês
+            const { data: carnesData, error: errCarnes } = await supabase
+                .from('carnes')
+                .select('*, carnes_parcelas(*)')
+                .eq('unit_id', state.currentUnit);
+
+            if (errCosts || errCats || errCarnes) {
+                console.warn('Erro ao carregar do Supabase:', errCosts || errCats || errCarnes);
+                return false;
+            }
+
+            // Mapear dados para o formato local
+            if (custos) {
+                state.costs = custos.map(c => ({
+                    id: c.id,
+                    desc: c.description,
+                    value: c.value,
+                    date: c.date,
+                    categoryId: c.category_id,
+                    center: c.cost_center,
+                    notes: c.notes,
+                    kg: c.kg,
+                    dueDate: c.due_date,
+                    paid: c.paid
+                }));
+            }
+
+            if (categorias) {
+                state.categories = categorias.map(c => ({
+                    id: c.id,
+                    name: c.name,
+                    color: c.color
+                }));
+            }
+
+            if (carnesData) {
+                state.carnes = carnesData.map(c => ({
+                    id: c.id,
+                    nome: c.name,
+                    telefone: c.phone,
+                    endereco: c.address,
+                    installments: (c.carnes_parcelas || []).map(p => ({
+                        id: p.id,
+                        number: p.installment_number,
+                        value: p.value,
+                        dueDate: p.due_date,
+                        paid: p.paid,
+                        paymentDate: p.payment_date
+                    }))
+                }));
+            }
+
+            saveState();
+            renderAll();
             return true;
         } catch (e) {
-            console.warn('Supabase load error:', e);
+            console.warn('Sync error:', e);
             return false;
         }
     }
@@ -90,10 +196,18 @@
     async function saveEmployeesToSupabase() {
         if (!supabase) return;
         try {
-            const employees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]';
+            const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+            const payload = employees.map(emp => ({
+                id: emp.id,
+                name: emp.name,
+                role: emp.role,
+                username: emp.username,
+                password: emp.password,
+                allowed_unit: emp.allowedUnit || 'all'
+            }));
             const { error } = await supabase
-                .from('app_data')
-                .upsert({ unit_id: 'employees', costs: employees, categories: '[]', contacts: '[]', campaigns: '[]', ingredients: '[]', recipes: '[]', updated_at: new Date().toISOString() }, { onConflict: 'unit_id' });
+                .from('funcionarios')
+                .upsert(payload, { onConflict: 'id' });
             if (error) console.warn('Supabase employees save error:', error.message);
         } catch (e) {
             console.warn('Supabase employees sync error:', e);
@@ -218,8 +332,6 @@
         localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(state.ingredients));
         localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(state.recipes));
         localStorage.setItem(storageKey(STORAGE_KEYS.CARNES_PREFIX), JSON.stringify(state.carnes));
-        // Sincronizar com Supabase
-        if (typeof saveToSupabase === 'function') saveToSupabase();
     }
 
     // ==========================================
@@ -601,22 +713,20 @@
 
         const cost = {
             id: 'cost_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-            description: desc,
+            desc: desc,
             value: value,
             date: date,
             categoryId: catId,
-            costCenter: center,
+            center: center,
             notes: notes,
             kg: kg,
             dueDate: dueDate || null,
-            paid: dueDate ? false : true,
-            unit: state.currentUnit,
-            createdAt: new Date().toISOString(),
+            paid: dueDate ? false : true
         };
 
         state.costs.unshift(cost);
         saveState();
-        saveToSupabase();
+        saveCostToSupabase(cost);
         renderAll();
 
         els.costForm.reset();
@@ -635,13 +745,14 @@
             return;
         }
 
-        state.categories.push({
+        const catObj = {
             id: 'cat_' + Date.now(),
             name: name,
             color: color,
-        });
+        };
+        state.categories.push(catObj);
         saveState();
-        saveToSupabase();
+        saveCategoryToSupabase(catObj);
         renderAll();
         els.catName.value = '';
         showToast('✅ Categoria adicionada!');
@@ -682,7 +793,7 @@
         showModal('Deseja realmente excluir este lançamento?', () => {
             state.costs = state.costs.filter(c => c.id !== id);
             saveState();
-            saveToSupabase();
+            deleteCostSupabase(id);
             renderAll();
             showToast('Lançamento excluído');
         });
@@ -696,7 +807,7 @@
         showModal(msg, () => {
             state.categories = state.categories.filter(c => c.id !== id);
             saveState();
-            saveToSupabase();
+            deleteCategorySupabase(id);
             renderAll();
             showToast('Categoria excluída');
         });
@@ -1599,7 +1710,7 @@
 
         state.carnes.unshift(carne);
         saveState();
-        saveToSupabase();
+        saveCarneToSupabase(carne);
         renderCarnes();
         $('#carneForm').reset();
         showToast('✅ Carnê cadastrado com sucesso!');
@@ -1616,7 +1727,7 @@
             parcela.paid = false;
             parcela.paidAt = null;
             parcela.paymentDate = null;
-            saveState(); saveToSupabase(); renderCarnes(); renderDashboard();
+            saveState(); saveCarneToSupabase(carne); renderCarnes(); renderDashboard();
             showToast('Parcela desmarcada');
         } else {
             // Ask for payment date
@@ -1637,7 +1748,7 @@
             parcela.paid = true;
             parcela.paidAt = new Date().toISOString();
             parcela.paymentDate = paymentDate;
-            saveState(); saveToSupabase(); renderCarnes(); renderDashboard();
+            saveState(); saveCarneToSupabase(carne); renderCarnes(); renderDashboard();
             showToast('✅ Parcela paga em ' + formatDate(paymentDate) + '!');
         }
     }
@@ -1646,7 +1757,7 @@
         showModal('Deseja excluir este carnê e todas as suas parcelas?', () => {
             state.carnes = state.carnes.filter(c => c.id !== id);
             saveState();
-            saveToSupabase();
+            deleteCarneSupabase(id);
             renderCarnes();
             showToast('Carnê excluído');
         });
