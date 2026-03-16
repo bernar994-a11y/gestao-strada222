@@ -143,6 +143,53 @@
                 return false;
             }
 
+            // --- MIGRAÇÃO AUTOMÁTICA DA TABELA ANTIGA ---
+            const isNewEmpty = (!custos || custos.length === 0) && (!categorias || categorias.length === 0);
+
+            if (isNewEmpty) {
+                console.log('🔄 Novas tabelas vazias. Tentando migrar da antiga app_data...');
+                const { data: oldData, error: errOld } = await supabase
+                    .from('app_data')
+                    .select('*')
+                    .eq('unit_id', state.currentUnit)
+                    .single();
+
+                if (!errOld && oldData) {
+                    try {
+                        let parsedCosts = [];
+                        let parsedCats = [];
+                        let parsedCarnes = [];
+
+                        if (oldData.costs) parsedCosts = JSON.parse(oldData.costs);
+                        if (oldData.categories) parsedCats = JSON.parse(oldData.categories);
+                        if (oldData.carnes) parsedCarnes = JSON.parse(oldData.carnes);
+
+                        state.costs = parsedCosts.map(c => ({
+                            ...c,
+                            desc: c.desc || c.description,
+                            center: c.center || c.costCenter
+                        }));
+                        state.categories = parsedCats;
+                        state.carnes = parsedCarnes;
+
+                        console.log(`📦 Migrando ${state.costs.length} custos para nova tabela...`);
+                        
+                        // Salvar na nova estrutura
+                        for (const c of state.costs) { await saveCostToSupabase(c); }
+                        for (const c of state.categories) { await saveCategoryToSupabase(c); }
+                        for (const c of state.carnes) { await saveCarneToSupabase(c); }
+
+                        console.log('✅ Migração de dados concluída!');
+                        saveState();
+                        renderAll();
+                        return true; // Retorna pois já atualizou o state
+                    } catch (e) {
+                        console.warn('Erro na migração:', e);
+                    }
+                }
+            }
+            // -------------------------------------------
+
             // Mapear dados para o formato local
             if (custos) {
                 state.costs = custos.map(c => ({
