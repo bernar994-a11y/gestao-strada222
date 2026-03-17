@@ -1057,7 +1057,7 @@
         return `<div class="entry-item" style="animation-delay:${idx * 0.05}s">
             <div class="entry-color" style="background:${color}"></div>
             <div class="entry-info">
-                <div class="entry-desc">${esc(cost.description)}</div>
+                <div class="entry-desc">${esc(cost.desc || '')}</div>
                 <div class="entry-meta">
                     <span>${formatDate(cost.date)}</span>
                     <span class="dot"></span>
@@ -1984,7 +1984,7 @@
 
             return `<div class="bill-item ${statusClass}" style="animation-delay:${i * 0.04}s">
                 <div class="bill-info">
-                    <span class="bill-desc">${esc(bill.description)}</span>
+                    <span class="bill-desc">${esc(bill.desc || '')}</span>
                     <span class="bill-date">${statusText}</span>
                 </div>
                 <span class="bill-value">${formatCurrency(bill.value)}</span>
@@ -2004,7 +2004,7 @@
         if (!cost) return;
         cost.paid = !cost.paid;
         saveState();
-        saveToSupabase();
+        saveCostToSupabase(cost);
         renderDashboard();
         showToast(cost.paid ? '✅ Boleto marcado como pago!' : 'Boleto desmarcado');
     }
