@@ -1006,14 +1006,14 @@
                     const d = new Date(c.date + 'T12:00:00');
                     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
                 });
-                const totalCaixaMes = currentMonthCaixa.reduce((s, c) => s + c.value, 0);
+                const totalCaixaMes = Math.round(currentMonthCaixa.reduce((s, c) => s + (c.value - (c.diferenca || 0)), 0) * 100) / 100;
 
                 const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                 const prevMonthCaixa = state.caixa.filter(c => {
                     const d = new Date(c.date + 'T12:00:00');
                     return d.getMonth() === prevMonth.getMonth() && d.getFullYear() === prevMonth.getFullYear();
                 });
-                const totalCaixaPrev = prevMonthCaixa.reduce((s, c) => s + c.value, 0);
+                const totalCaixaPrev = Math.round(prevMonthCaixa.reduce((s, c) => s + (c.value - (c.diferenca || 0)), 0) * 100) / 100;
 
                 const variation = totalCaixaPrev > 0 ? ((totalCaixaMes - totalCaixaPrev) / totalCaixaPrev * 100).toFixed(1) : 0;
                 const trend = variation > 0 ? '↑' : variation < 0 ? '↓' : '→';
@@ -2570,7 +2570,7 @@
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
 
-        const totalCaixaMes = currentMonthCaixa.reduce((s, c) => s + (c.value - (c.diferenca || 0)), 0);
+        const totalCaixaMes = Math.round(currentMonthCaixa.reduce((s, c) => s + (c.value - (c.diferenca || 0)), 0) * 100) / 100;
         const totalDifMes = currentMonthCaixa.reduce((s, c) => s + c.diferenca, 0);
         
         const monthDespesas = state.costs.filter(c => {
