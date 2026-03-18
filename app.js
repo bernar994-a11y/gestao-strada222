@@ -675,8 +675,9 @@
         });
 
         // Update sidebar active
-        els.navItems.forEach((item, i) => {
-            item.classList.toggle('active', i === index);
+        els.navItems.forEach((item) => {
+            const itemPanel = parseInt(item.dataset.panel);
+            item.classList.toggle('active', itemPanel === index);
         });
 
         // Re-render
@@ -999,6 +1000,32 @@
                 const trend = variation > 0 ? '↑' : variation < 0 ? '↓' : '→';
                 const trendClass = variation > 0 ? 'kpi-up' : variation < 0 ? 'kpi-down' : 'kpi-neutral';
                 kpis.push({ icon: trend, label: 'vs Mês Anterior', value: `${variation > 0 ? '+' : ''}${variation}%`, sub: formatCurrency(prevTotal), extraClass: trendClass });
+            }
+            if (state.currentUnit === 'bikecafe' && state.caixa) {
+                const currentMonthCaixa = state.caixa.filter(c => {
+                    const d = new Date(c.date + 'T12:00:00');
+                    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                });
+                const totalCaixaMes = currentMonthCaixa.reduce((s, c) => s + c.value, 0);
+
+                const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                const prevMonthCaixa = state.caixa.filter(c => {
+                    const d = new Date(c.date + 'T12:00:00');
+                    return d.getMonth() === prevMonth.getMonth() && d.getFullYear() === prevMonth.getFullYear();
+                });
+                const totalCaixaPrev = prevMonthCaixa.reduce((s, c) => s + c.value, 0);
+
+                const variation = totalCaixaPrev > 0 ? ((totalCaixaMes - totalCaixaPrev) / totalCaixaPrev * 100).toFixed(1) : 0;
+                const trend = variation > 0 ? '↑' : variation < 0 ? '↓' : '→';
+                const trendClass = variation > 0 ? 'kpi-up' : variation < 0 ? 'kpi-down' : 'kpi-neutral';
+
+                kpis.push({
+                    icon: '💰',
+                    label: 'Fluxo de Caixa',
+                    value: formatCurrency(totalCaixaMes),
+                    sub: totalCaixaPrev > 0 ? `${trend} ${Math.abs(variation)}% vs mês anterior` : 'Sem histórico anterior',
+                    extraClass: trendClass
+                });
             }
 
             kpiRow.innerHTML = kpis.map((k, i) => `
