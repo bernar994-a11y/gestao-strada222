@@ -1707,13 +1707,17 @@
         if (form) form.addEventListener('submit', (e) => { e.preventDefault(); addCarne(); });
 
         // Currency masks for carnê
-        const carneValorInput = $('#carneValorParcela');
-        if (carneValorInput) carneValorInput.addEventListener('input', (e) => {
-            let val = e.target.value.replace(/\D/g, '');
-            if (!val) { e.target.value = ''; return; }
-            val = (parseInt(val) / 100).toFixed(2);
-            e.target.value = val.replace('.', ',');
-        });
+        function applyCurrencyMask(el) {
+            if (!el) return;
+            el.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/\D/g, '');
+                if (!val) { e.target.value = ''; return; }
+                val = (parseInt(val) / 100).toFixed(2);
+                e.target.value = val.replace('.', ',');
+            });
+        }
+        applyCurrencyMask($('#carneValorTotal'));
+        applyCurrencyMask($('#carneEntrada'));
     }
 
     function addCarne() {
@@ -1721,13 +1725,22 @@
         const telefone = $('#carneTelefone').value.trim();
         const endereco = $('#carneEndereco').value.trim();
         const parcelas = parseInt($('#carneParcelas').value) || 0;
-        const valorParcela = parseCurrency($('#carneValorParcela').value);
+        const valorTotal = parseCurrency($('#carneValorTotal').value);
+        const entrada = parseCurrency($('#carneEntrada').value) || 0;
         const vencimento = $('#carneVencimento').value;
 
-        if (!nome || parcelas <= 0 || valorParcela <= 0 || !vencimento) {
+        if (!nome || parcelas <= 0 || valorTotal <= 0 || !vencimento) {
             showToast('⚠ Preencha todos os campos obrigatórios');
             return;
         }
+
+        if (entrada >= valorTotal) {
+            showToast('⚠ O valor de entrada deve ser menor que o valor total');
+            return;
+        }
+
+        const saldoFinanciar = valorTotal - entrada;
+        const valorParcela = Math.round((saldoFinanciar / parcelas) * 100) / 100;
 
         // Generate installments
         const installments = [];
@@ -1741,6 +1754,7 @@
                 dueDate: dueDate.toISOString().split('T')[0],
                 paid: false,
                 paidAt: null,
+                paidValue: null,
             });
         }
 
@@ -1748,8 +1762,9 @@
             id: 'carne_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             nome, telefone, endereco,
             totalParcelas: parcelas,
+            valorTotal,
+            entrada,
             valorParcela,
-            valorTotal: parcelas * valorParcela,
             installments,
             createdAt: new Date().toISOString(),
             createdBy: currentUser ? currentUser.name : 'Sistema',
@@ -1770,19 +1785,24 @@
         if (!parcela) return;
 
         if (parcela.paid) {
-            // Unmark as paid
+            // Desmarcar pagamento — reverter valor pago
+            const paidVal = parcela.paidValue || 0;
             parcela.paid = false;
             parcela.paidAt = null;
             parcela.paymentDate = null;
+            parcela.paidValue = null;
+
+            // Se houve excedente anteriormente redistribuído, recalcular parcelas restantes
+            recalcRemainingInstallments(carne);
+
             saveState(); saveCarneToSupabase(carne); renderCarnes(); renderDashboard();
             showToast('Parcela desmarcada');
         } else {
-            // Ask for payment date
+            // 1. Pedir data de pagamento
             const paymentDateInput = prompt('Data do Pagamento (DD/MM/AAAA):', new Date().toLocaleDateString('pt-BR'));
-            if (paymentDateInput === null) return; // cancelled
+            if (paymentDateInput === null) return;
             let paymentDate = null;
             if (paymentDateInput) {
-                // Parse DD/MM/YYYY
                 const parts = paymentDateInput.split('/');
                 if (parts.length === 3) {
                     paymentDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
@@ -1792,11 +1812,46 @@
             } else {
                 paymentDate = new Date().toISOString().split('T')[0];
             }
+
+            // 2. Pedir valor pago (pré-preenchido com valor da parcela)
+            const valorStr = prompt(
+                'Valor pago nesta parcela (R$):',
+                parcela.value.toFixed(2).replace('.', ',')
+            );
+            if (valorStr === null) return;
+            const paidValue = parseCurrency(valorStr) || parcela.value;
+
             parcela.paid = true;
             parcela.paidAt = new Date().toISOString();
             parcela.paymentDate = paymentDate;
+            parcela.paidValue = paidValue;
+
+            // 3. Se pagou a mais, redistribuir diferença nas parcelas restantes
+            if (paidValue > parcela.value) {
+                const excedente = paidValue - parcela.value;
+                const remaining = carne.installments.filter(p => !p.paid && p.number !== parcelaNum);
+                if (remaining.length > 0) {
+                    const desconto = Math.round((excedente / remaining.length) * 100) / 100;
+                    remaining.forEach(p => {
+                        p.value = Math.max(0, Math.round((p.value - desconto) * 100) / 100);
+                    });
+                }
+            }
+
             saveState(); saveCarneToSupabase(carne); renderCarnes(); renderDashboard();
-            showToast('✅ Parcela paga em ' + formatDate(paymentDate) + '!');
+            showToast('✅ Parcela paga em ' + formatDate(paymentDate) + ' — ' + formatCurrency(paidValue) + '!');
+        }
+    }
+
+    function recalcRemainingInstallments(carne) {
+        const totalPaid = carne.installments
+            .filter(p => p.paid)
+            .reduce((sum, p) => sum + (p.paidValue || p.value), 0);
+        const saldo = (carne.valorTotal || 0) - (carne.entrada || 0) - totalPaid;
+        const remaining = carne.installments.filter(p => !p.paid);
+        if (remaining.length > 0 && saldo > 0) {
+            const newVal = Math.round((saldo / remaining.length) * 100) / 100;
+            remaining.forEach(p => { p.value = newVal; });
         }
     }
 
@@ -1857,12 +1912,14 @@
                         statusText = `Vence em ${diffDays}d`;
                     }
                     const paidDateStr = p.paid && p.paymentDate ? ` ${formatDate(p.paymentDate)}` : '';
+                    const paidValueStr = p.paid && p.paidValue != null ? `<span class="parcela-paid-value" style="color:#10B981;font-weight:600;font-size:0.7rem;margin-left:4px">Pago: ${formatCurrency(p.paidValue)}</span>` : '';
                     return `<div class="parcela-item ${statusClass}">
                         <div class="parcela-info">
                             <span class="parcela-num">${p.number}ª</span>
                             <span class="parcela-date">${formatDate(p.dueDate)}</span>
                             <span class="parcela-valor">${formatCurrency(p.value)}</span>
                             <span class="parcela-status-badge">${statusText}${paidDateStr}</span>
+                            ${paidValueStr}
                         </div>
                         <button class="parcela-toggle" onclick="event.stopPropagation(); GestaoStrada.toggleParcelaPaid('${carne.id}', ${p.number})" title="${p.paid ? 'Desmarcar' : 'Registrar pagamento'}">
                             ${p.paid ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'}
@@ -1899,6 +1956,11 @@
                             <div class="carne-meta">
                                 ${carne.telefone ? `<span>📱 ${esc(carne.telefone)}</span>` : ''}
                                 ${carne.endereco ? `<span class="dot"></span><span>📍 ${esc(carne.endereco)}</span>` : ''}
+                            </div>
+                            <div class="carne-meta" style="margin-top:0.3rem">
+                                <span>💰 Total: ${formatCurrency(carne.valorTotal || 0)}</span>
+                                ${carne.entrada ? `<span class="dot"></span><span>📥 Entrada: ${formatCurrency(carne.entrada)}</span>` : ''}
+                                <span class="dot"></span><span>📋 Parcela: ${formatCurrency(carne.valorParcela || 0)}</span>
                             </div>
                         </div>
                     </div>
