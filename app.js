@@ -2570,7 +2570,7 @@
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
 
-        const totalCaixaMes = currentMonthCaixa.reduce((s, c) => s + c.value, 0);
+        const totalCaixaMes = currentMonthCaixa.reduce((s, c) => s + (c.value - (c.diferenca || 0)), 0);
         const totalDifMes = currentMonthCaixa.reduce((s, c) => s + c.diferenca, 0);
         
         const monthDespesas = state.costs.filter(c => {
@@ -2611,7 +2611,7 @@
         const groupedByDay = {};
         currentMonthCaixa.forEach(c => {
             if (!groupedByDay[c.date]) groupedByDay[c.date] = { caixa: 0, dif: 0 };
-            groupedByDay[c.date].caixa += c.value;
+            groupedByDay[c.date].caixa += (c.value - (c.diferenca || 0));
             groupedByDay[c.date].dif += c.diferenca;
         });
 
