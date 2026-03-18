@@ -229,6 +229,15 @@
                     </svg>
                     <span>Gestão de Carnê</span>
                 </button>
+                <button class="sidebar-nav-item" data-panel="11" id="navCaixa" style="display:none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <line x1="2" y1="10" x2="22" y2="10" />
+                        <line x1="12" y1="4" x2="12" y2="10" />
+                    </svg>
+                    <span>Caixa</span>
+                </button>
                 <button class="sidebar-nav-item" data-panel="9" id="navEvolution">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -880,6 +889,91 @@
                         <div class="section-block" style="margin-top: 2rem;">
                             <h3 class="section-title">Carnês Cadastrados</h3>
                             <div class="carnes-list" id="carnesList"></div>
+                        </div>
+                    </div>
+                </section>
+                <!-- Panel 11: Caixa (Bike Café) -->
+                <section class="panel" id="panelCaixa" data-panel="11">
+                    <div class="panel-header">
+                        <h2>Controle de Caixa</h2>
+                        <p class="panel-subtitle">Lance o fechamento diário do caixa e acompanhe o fluxo</p>
+                    </div>
+                    <div class="panel-content">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;">
+                            <!-- Formulário de Lançamento -->
+                            <div>
+                                <h3 class="section-title">Lançar Fechamento</h3>
+                                <form id="caixaForm" class="cost-form" autocomplete="off">
+                                    <div class="form-group">
+                                        <label for="caixaData">Data</label>
+                                        <input type="date" id="caixaData" required>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="caixaValor">Valor do Caixa (R$)</label>
+                                            <input type="text" id="caixaValor" placeholder="0,00" required inputmode="decimal">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="caixaTurno">Turno</label>
+                                            <select id="caixaTurno" required>
+                                                <option value="">Selecione</option>
+                                                <option value="manha">Manhã</option>
+                                                <option value="tarde">Tarde</option>
+                                                <option value="noite">Noite</option>
+                                                <option value="integral">Integral</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="caixaDiferenca">Diferença (R$) — positivo se sobrou, negativo se faltou</label>
+                                        <input type="text" id="caixaDiferenca" placeholder="0,00" inputmode="decimal">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="caixaObs">Observações</label>
+                                        <input type="text" id="caixaObs" placeholder="Ex: Caixa fechado por João">
+                                    </div>
+                                    <button type="submit" class="btn-primary">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="12" y1="5" x2="12" y2="19" />
+                                            <line x1="5" y1="12" x2="19" y2="12" />
+                                        </svg>
+                                        <span>Lançar Caixa</span>
+                                    </button>
+                                </form>
+
+                                <div class="section-block" style="margin-top:2rem">
+                                    <h3 class="section-title">Últimos Lançamentos</h3>
+                                    <div id="caixaList"></div>
+                                </div>
+                            </div>
+
+                            <!-- Demonstrativo de Fluxo -->
+                            <div>
+                                <h3 class="section-title">📊 Demonstrativo do Mês</h3>
+                                <div class="dash-hero" style="margin-bottom:1.5rem">
+                                    <div class="dash-hero-grid" style="grid-template-columns:1fr 1fr;gap:1rem">
+                                        <div class="dash-hero-card">
+                                            <span class="dash-hero-label">Total Caixa (Mês)</span>
+                                            <span class="dash-hero-value" id="caixaTotalMes">R$ 0,00</span>
+                                        </div>
+                                        <div class="dash-hero-card">
+                                            <span class="dash-hero-label">Total Despesas (Mês)</span>
+                                            <span class="dash-hero-value" id="caixaDespesasMes">R$ 0,00</span>
+                                        </div>
+                                        <div class="dash-hero-card" style="border-left:3px solid #10B981">
+                                            <span class="dash-hero-label">💰 Lucro Estimado</span>
+                                            <span class="dash-hero-value" id="caixaLucroMes" style="color:#10B981">R$ 0,00</span>
+                                        </div>
+                                        <div class="dash-hero-card">
+                                            <span class="dash-hero-label">⚠ Diferença Acumulada</span>
+                                            <span class="dash-hero-value" id="caixaDifTotal">R$ 0,00</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <h3 class="section-title">📈 Fluxo Diário</h3>
+                                <div id="caixaFluxoDiario"></div>
+                            </div>
                         </div>
                     </div>
                 </section>

@@ -138,6 +138,12 @@
                 .select('*, carnes_parcelas(*)')
                 .eq('unit_id', state.currentUnit);
 
+            // 4. Carregar Caixa
+            const { data: caixaData, error: errCaixa } = await supabase
+                .from('caixa')
+                .select('*')
+                .eq('unit_id', state.currentUnit);
+
             if (errCosts || errCats || errCarnes) {
                 console.warn('Erro ao carregar do Supabase:', errCosts || errCats || errCarnes);
                 return false;
@@ -229,6 +235,21 @@
                         paymentDate: p.payment_date
                     }))
                 }));
+            }
+
+            if (typeof caixaData !== 'undefined' && caixaData) {
+                state.caixa = caixaData.map(c => ({
+                    id: c.id,
+                    date: c.date,
+                    value: c.value,
+                    turno: c.turno,
+                    diferenca: c.diferenca || 0,
+                    obs: c.obs,
+                    unit_id: c.unit_id,
+                    createdAt: c.created_at
+                }));
+            } else {
+                state.caixa = [];
             }
 
             saveState();
@@ -326,6 +347,7 @@
         RECIPES: 'gestao_strada_recipes',
         EMPLOYEES: 'gestao_strada_employees',
         CARNES_PREFIX: 'gestao_strada_carnes_',
+        CAIXA_PREFIX: 'gestao_strada_caixa_',
     };
 
     let state = {
@@ -337,6 +359,7 @@
         ingredients: [],
         recipes: [],
         carnes: [],
+        caixa: [],
         currentPanel: 0,
     };
 
@@ -569,6 +592,10 @@
         const navCalc = $('#navCalculator');
         if (navCalc) navCalc.style.display = state.currentUnit === 'bikecafe' ? '' : 'none';
 
+        // Show/hide caixa nav (only for bikecafe)
+        const navCaixa = $('#navCaixa');
+        if (navCaixa) navCaixa.style.display = state.currentUnit === 'bikecafe' ? '' : 'none';
+
         // Show/hide carnê nav (only for bikeshop)
         const navCarne = $('#navCarne');
         if (navCarne) navCarne.style.display = state.currentUnit === 'bikeshop' ? '' : 'none';
@@ -636,7 +663,8 @@
 
         // Toggle panels
         els.panels.forEach((p, i) => {
-            if (i === index) {
+            const pIndex = p.dataset.panel ? parseInt(p.dataset.panel) : i;
+            if (pIndex === index) {
                 p.classList.add('active');
                 p.style.animation = 'none';
                 p.offsetHeight; // force reflow
@@ -656,6 +684,7 @@
         if (index === 3) updateExportPreview();
         if (index === 8) renderCarnes();
         if (index === 9) renderCostEvolution();
+        if (index === 11) renderCaixa();
     }
 
     // ==========================================
@@ -741,6 +770,8 @@
             e.preventDefault();
             addCategory();
         });
+
+        if (typeof setupCaixa === 'function') setupCaixa();
     }
 
     function addCost() {
@@ -2436,6 +2467,198 @@
     }
 
     // ==========================================
+    // Caixa (Bike Café)
+    // ==========================================
+    let caixaSetup = false;
+    function setupCaixa() {
+        if (caixaSetup) return;
+        caixaSetup = true;
+        const form = $('#caixaForm');
+        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); addCaixa(); });
+
+        const valorInput = $('#caixaValor');
+        const difInput = $('#caixaDiferenca');
+        
+        function applyCurrencyMask(el) {
+            if (!el) return;
+            el.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/[^\d-]/g, ''); 
+                if (!val) { e.target.value = ''; return; }
+                const isNegative = val.startsWith('-');
+                val = val.replace('-', '');
+                val = (parseInt(val) / 100).toFixed(2);
+                e.target.value = (isNegative ? '-' : '') + val.replace('.', ',');
+            });
+        }
+        applyCurrencyMask(valorInput);
+        applyCurrencyMask(difInput);
+        
+        const dataInput = $('#caixaData');
+        if (dataInput) dataInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    function addCaixa() {
+        const data = $('#caixaData').value;
+        const valor = parseCurrency($('#caixaValor').value);
+        const turno = $('#caixaTurno').value;
+        const diferenca = parseCurrency($('#caixaDiferenca').value) || 0;
+        const obs = $('#caixaObs').value.trim();
+
+        if (!data || valor <= 0 || !turno) {
+            showToast('⚠ Preencha os campos obrigatórios (Data, Valor, Turno)');
+            return;
+        }
+
+        const entry = {
+            id: 'caixa_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            date: data,
+            value: valor,
+            turno: turno,
+            diferenca: diferenca,
+            obs: obs,
+            unit_id: state.currentUnit,
+            createdAt: new Date().toISOString()
+        };
+
+        state.caixa.unshift(entry);
+        saveState();
+        saveCaixaToSupabase(entry);
+        renderCaixa();
+        
+        $('#caixaValor').value = '';
+        $('#caixaDiferenca').value = '';
+        $('#caixaObs').value = '';
+        showToast('✅ Lançamento de Caixa salvo!');
+    }
+
+    function renderCaixa() {
+        const list = $('#caixaList');
+        const fluxoDiario = $('#caixaFluxoDiario');
+        if (!list || !fluxoDiario) return;
+
+        const unitCaixa = state.caixa.filter(c => c.unit_id === state.currentUnit);
+        const now = new Date();
+        const currentMonthCaixa = unitCaixa.filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+
+        const totalCaixaMes = currentMonthCaixa.reduce((s, c) => s + c.value, 0);
+        const totalDifMes = currentMonthCaixa.reduce((s, c) => s + c.diferenca, 0);
+        
+        const monthDespesas = state.costs.filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).reduce((s, c) => s + c.value, 0);
+
+        const lucroEstimado = totalCaixaMes - monthDespesas;
+
+        $('#caixaTotalMes').textContent = formatCurrency(totalCaixaMes);
+        $('#caixaDespesasMes').textContent = formatCurrency(monthDespesas);
+        $('#caixaLucroMes').textContent = formatCurrency(lucroEstimado);
+        $('#caixaLucroMes').style.color = lucroEstimado >= 0 ? '#10B981' : '#EF4444';
+        $('#caixaDifTotal').textContent = formatCurrency(totalDifMes);
+        $('#caixaDifTotal').style.color = totalDifMes === 0 ? 'var(--text-muted)' : totalDifMes > 0 ? '#10B981' : '#EF4444';
+
+        if (unitCaixa.length === 0) {
+            list.innerHTML = '<div class="empty-state" style="padding:1rem;"><p>Nenhum lançamento registrado</p></div>';
+        } else {
+            list.innerHTML = unitCaixa.slice(0, 5).map((c, i) => `
+                <div class="entry-item" style="animation-delay:${i * 0.04}s">
+                    <div class="entry-color" style="background:#00B894"></div>
+                    <div class="entry-info">
+                        <div class="entry-desc">${formatDate_PT(c.date)} — ${c.turno.toUpperCase()}</div>
+                        <div class="entry-meta">
+                            ${c.obs ? `<span>${esc(c.obs)}</span>` : ''}
+                            ${c.diferenca !== 0 ? `<span class="dot"></span><span style="color:${c.diferenca > 0 ? '#10B981' : '#EF4444'}">Dif: ${formatCurrency(c.diferenca)}</span>` : ''}
+                        </div>
+                    </div>
+                    <span class="entry-value" style="color:#10B981">+ ${formatCurrency(c.value)}</span>
+                    <button class="entry-delete" onclick="GestaoStrada.deleteCaixa('${c.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        const groupedByDay = {};
+        currentMonthCaixa.forEach(c => {
+            if (!groupedByDay[c.date]) groupedByDay[c.date] = { caixa: 0, dif: 0 };
+            groupedByDay[c.date].caixa += c.value;
+            groupedByDay[c.date].dif += c.diferenca;
+        });
+
+        const despesasByDay = {};
+        state.costs.forEach(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                if (!despesasByDay[c.date]) despesasByDay[c.date] = 0;
+                despesasByDay[c.date] += c.value;
+            }
+        });
+
+        const allDates = [...new Set([...Object.keys(groupedByDay), ...Object.keys(despesasByDay)])];
+        allDates.sort((a, b) => b.localeCompare(a));
+
+        if (allDates.length === 0) {
+            fluxoDiario.innerHTML = '<div class="empty-state" style="padding:1rem;"><p>Sem dados de fluxo para este mês</p></div>';
+        } else {
+            fluxoDiario.innerHTML = allDates.map((date, i) => {
+                const caixaDia = groupedByDay[date] ? groupedByDay[date].caixa : 0;
+                const despesaDia = despesasByDay[date] || 0;
+                const saldoDia = caixaDia - despesaDia;
+
+                return `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem;border-bottom:1px solid rgba(255,255,255,0.05);animation:fadeInUp 0.3s ease-out forwards;animation-delay:${i * 0.05}s">
+                        <div style="display:flex;flex-direction:column;">
+                            <span style="font-weight:600;font-size:0.85rem">${formatDate_PT(date)}</span>
+                            <span style="font-size:0.7rem;color:var(--text-muted)">Despesas: ${formatCurrency(despesaDia)}</span>
+                        </div>
+                        <div style="text-align:right">
+                            <span style="font-weight:700;color:${saldoDia >= 0 ? '#10B981' : '#EF4444'}">${saldoDia >= 0 ? '+' : ''}${formatCurrency(saldoDia)}</span>
+                            ${caixaDia > 0 ? `<div style="font-size:0.65rem;color:#10B981">Caixa: ${formatCurrency(caixaDia)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    function formatDate_PT(dateStr) {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+        return dateStr;
+    }
+
+    async function saveCaixaToSupabase(entry) {
+        if (!supabase) return;
+        try {
+            await supabase.from('caixa').upsert({
+                id: entry.id,
+                date: entry.date,
+                value: entry.value,
+                turno: entry.turno,
+                diferenca: entry.diferenca,
+                obs: entry.obs,
+                unit_id: entry.unit_id
+            }, { onConflict: 'id' });
+        } catch (e) { }
+    }
+
+    async function deleteCaixa(id) {
+        showModal('Deseja excluir este lançamento de caixa?', async () => {
+            state.caixa = state.caixa.filter(c => c.id !== id);
+            saveState();
+            renderCaixa();
+            if (supabase) {
+                try { await supabase.from('caixa').delete().eq('id', id); } catch (e) { }
+            }
+            showToast('Lançamento excluído');
+        });
+    }
+
+    // ==========================================
     // Public API
     // ==========================================
     window.GestaoStrada = {
@@ -2443,6 +2666,7 @@
         deleteCost, deleteCategory, deleteContact, deleteEmployee,
         deleteIngredient, deleteRecipe, switchCalcTab,
         deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
+        deleteCaixa,
         askAI,
     };
 
