@@ -92,7 +92,9 @@
                 name: carne.nome,
                 phone: carne.telefone,
                 address: carne.endereco,
-                unit_id: state.currentUnit
+                unit_id: state.currentUnit,
+                valor_total: carne.valorTotal || 0,
+                entrada: carne.entrada || 0
             }, { onConflict: 'id' });
 
             if (carne.installments && carne.installments.length > 0) {
@@ -103,7 +105,8 @@
                     value: p.value,
                     due_date: p.dueDate,
                     paid: p.paid,
-                    payment_date: p.paymentDate || null
+                    payment_date: p.paymentDate || null,
+                    paid_value: p.paidValue || null
                 }));
                 await supabase.from('carnes_parcelas').upsert(payload, { onConflict: 'id' });
             }
@@ -226,13 +229,16 @@
                     nome: c.name,
                     telefone: c.phone,
                     endereco: c.address,
+                    valorTotal: c.valor_total || 0,
+                    entrada: c.entrada || 0,
                     installments: (c.carnes_parcelas || []).map(p => ({
                         id: p.id,
                         number: p.installment_number,
                         value: p.value,
                         dueDate: p.due_date,
                         paid: p.paid,
-                        paymentDate: p.payment_date
+                        paymentDate: p.payment_date,
+                        paidValue: p.paid_value || null
                     }))
                 }));
             }
