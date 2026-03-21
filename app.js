@@ -2145,6 +2145,7 @@
         let carneOverdueCount = 0;
         let billDueCount = 0;
         let billOverdueCount = 0;
+        const carneAlerts = []; // {nome, msg}
 
         // Check carnê installments
         if (state.carnes && state.carnes.length > 0) {
@@ -2153,8 +2154,13 @@
                     if (p.paid) return;
                     const dueDate = new Date(p.dueDate + 'T12:00:00');
                     const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-                    if (diffDays < 0) carneOverdueCount++;
-                    else if (diffDays <= 3) carneDueCount++;
+                    if (diffDays < 0) {
+                        carneOverdueCount++;
+                        carneAlerts.push(`⚠️ Carnê de ${carne.nome} — parcela ${p.number} VENCIDA!`);
+                    } else if (diffDays <= 3) {
+                        carneDueCount++;
+                        carneAlerts.push(`📢 Carnê de ${carne.nome} — parcela ${p.number} vence em ${diffDays === 0 ? 'HOJE' : diffDays + ' dia(s)'}!`);
+                    }
                 });
             });
         }
@@ -2204,17 +2210,23 @@
             }
         }
 
-        // Show notification toasts
-        const totalAlerts = carneDueCount + carneOverdueCount + billDueCount + billOverdueCount;
-        if (totalAlerts > 0) {
+        // Show notification toasts — individual carnê alerts with client name
+        if (carneAlerts.length > 0) {
+            carneAlerts.forEach((msg, idx) => {
+                setTimeout(() => showToast(msg), 1500 + idx * 2500);
+            });
+        }
+
+        // Bills toast (separate)
+        const billTotal = billDueCount + billOverdueCount;
+        if (billTotal > 0) {
+            const delay = 1500 + carneAlerts.length * 2500;
             setTimeout(() => {
                 const parts = [];
-                if (carneOverdueCount > 0) parts.push(`${carneOverdueCount} parcela(s) de carnê vencida(s)`);
-                if (carneDueCount > 0) parts.push(`${carneDueCount} parcela(s) de carnê próxima(s)`);
                 if (billOverdueCount > 0) parts.push(`${billOverdueCount} boleto(s) vencido(s)`);
                 if (billDueCount > 0) parts.push(`${billDueCount} boleto(s) próximo(s)`);
                 showToast(`🚨 ${parts.join(', ')}!`);
-            }, 1500);
+            }, delay);
         }
     }
 
