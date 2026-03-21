@@ -1434,17 +1434,50 @@
         marketingSetup = true;
         const form = $('#campaignForm');
         const btnPreview = $('#btnPreviewCampaign');
-        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); sendCampaign(); });
+        if (form) form.addEventListener('submit', (e) => { e.preventDefault(); sendCampaignWhatsApp(); });
         if (btnPreview) btnPreview.addEventListener('click', previewCampaign);
     }
 
+    function renderMktContacts() {
+        const list = $('#mktContactsList');
+        if (!list) return;
+        const contacts = state.contacts || [];
+        if (contacts.length === 0) {
+            list.innerHTML = '<div class="empty-state" style="padding:1rem;"><p>Nenhum contato cadastrado. Adicione na aba Contatos.</p></div>';
+            return;
+        }
+        list.innerHTML = contacts.map(c => {
+            const hasPhone = c.phone && c.phone.trim();
+            return `<label style="display:flex;align-items:center;gap:0.75rem;padding:0.6rem 0.75rem;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;border-radius:8px;transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+                <input type="checkbox" class="mkt-contact-check" data-contact-id="${c.id}" ${hasPhone ? '' : 'disabled'} onchange="GestaoStrada.updateMktCount()" style="width:18px;height:18px;accent-color:#25D366;cursor:pointer">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:0.85rem">${esc(c.name)}</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted)">
+                        ${hasPhone ? '📱 ' + esc(c.phone) : '<span style="color:#EF4444">Sem telefone</span>'}
+                        ${c.email ? ' · ✉ ' + esc(c.email) : ''}
+                    </div>
+                </div>
+            </label>`;
+        }).join('');
+        updateMktSelectedCount();
+    }
+
+    function toggleAllMktContacts() {
+        const checks = document.querySelectorAll('.mkt-contact-check:not(:disabled)');
+        const allChecked = [...checks].every(c => c.checked);
+        checks.forEach(c => c.checked = !allChecked);
+        updateMktSelectedCount();
+    }
+
+    function updateMktSelectedCount() {
+        const el = $('#mktSelectedCount');
+        if (!el) return;
+        const count = document.querySelectorAll('.mkt-contact-check:checked').length;
+        el.textContent = `${count} selecionado(s)`;
+    }
+
     function updateRecipientsSelect() {
-        const sel = $('#campaignRecipients');
-        if (!sel) return;
-        const tags = new Set();
-        state.contacts.forEach(c => c.tags.forEach(t => tags.add(t)));
-        sel.innerHTML = `<option value="all">Todos os contatos (${state.contacts.length})</option>` +
-            [...tags].map(t => `<option value="tag:${t}">Tag: ${esc(t)}</option>`).join('');
+        renderMktContacts();
     }
 
     function previewCampaign() {
@@ -1454,28 +1487,46 @@
         const bubble = $('#previewBubble');
         const rCount = $('#recipientCount');
         if (!title || !msg) { showToast('⚠ Preencha título e mensagem'); return; }
-        const recipients = getRecipients();
+        const selectedIds = [...document.querySelectorAll('.mkt-contact-check:checked')].map(c => c.dataset.contactId);
+        const count = selectedIds.length > 0 ? selectedIds.length : state.contacts.filter(c => c.phone).length;
         bubble.innerHTML = `<strong>${esc(title)}</strong><br><br>${esc(msg).replace(/\n/g, '<br>')}`;
-        rCount.textContent = `📤 Será enviada para ${recipients.length} contato(s)`;
+        rCount.textContent = `📤 Será enviada para ${count} contato(s) via WhatsApp`;
         preview.style.display = '';
     }
 
     function getRecipients() {
-        const val = ($('#campaignRecipients') || {}).value || 'all';
-        if (val === 'all') return state.contacts;
-        if (val.startsWith('tag:')) {
-            const tag = val.slice(4);
-            return state.contacts.filter(c => c.tags.includes(tag));
-        }
-        return state.contacts;
+        return state.contacts.filter(c => c.phone && c.phone.trim());
     }
 
-    function sendCampaign() {
+    function sendCampaignWhatsApp() {
         const title = $('#campaignTitle').value.trim();
         const msg = $('#campaignMessage').value.trim();
         if (!title || !msg) { showToast('⚠ Preencha título e mensagem'); return; }
-        const recipients = getRecipients();
-        if (recipients.length === 0) { showToast('⚠ Nenhum destinatário encontrado'); return; }
+
+        const selectedIds = [...document.querySelectorAll('.mkt-contact-check:checked')].map(c => c.dataset.contactId);
+        let recipients;
+        if (selectedIds.length > 0) {
+            recipients = state.contacts.filter(c => selectedIds.includes(c.id) && c.phone && c.phone.trim());
+        } else {
+            recipients = state.contacts.filter(c => c.phone && c.phone.trim());
+        }
+
+        if (recipients.length === 0) {
+            showToast('⚠ Nenhum contato com telefone encontrado');
+            return;
+        }
+
+        const fullMessage = `*${title}*\n\n${msg}`;
+        const encoded = encodeURIComponent(fullMessage);
+
+        recipients.forEach((contact, idx) => {
+            const phone = contact.phone.replace(/\D/g, '');
+            const whatsappPhone = phone.startsWith('55') ? phone : '55' + phone;
+            setTimeout(() => {
+                window.open(`https://wa.me/${whatsappPhone}?text=${encoded}`, '_blank');
+            }, idx * 1500);
+        });
+
         state.campaigns.unshift({
             id: 'camp_' + Date.now(), title, message: msg,
             recipientCount: recipients.length, sentAt: new Date().toISOString(),
@@ -1484,12 +1535,15 @@
         saveState(); renderCampaigns();
         $('#campaignForm').reset();
         $('#campaignPreview').style.display = 'none';
-        showToast(`✅ Campanha "${title}" disparada para ${recipients.length} contato(s)!`);
+        showToast(`✅ WhatsApp aberto para ${recipients.length} contato(s)!`);
     }
+
+    function sendCampaign() { sendCampaignWhatsApp(); }
 
     function renderCampaigns() {
         const list = $('#campaignsList');
         if (!list) return;
+        renderMktContacts();
         if (state.campaigns.length === 0) {
             list.innerHTML = '<div class="empty-state"><p>Nenhuma campanha enviada</p></div>';
             return;
@@ -1498,12 +1552,12 @@
             const d = new Date(c.sentAt);
             const dateStr = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             return `<div class="entry-item" style="animation-delay:${i * 0.03}s">
-                <div class="entry-color" style="background:#A855F7"></div>
+                <div class="entry-color" style="background:#25D366"></div>
                 <div class="entry-info">
                     <div class="entry-desc">${esc(c.title)}</div>
                     <div class="entry-meta"><span>📤 ${c.recipientCount} destinatário(s)</span><span class="dot"></span><span>${dateStr}</span><span class="dot"></span><span>por ${esc(c.sentBy)}</span></div>
                 </div>
-                <span class="entry-value" style="color:#10B981;font-size:0.8rem;">✓ Enviada</span>
+                <span class="entry-value" style="color:#25D366;font-size:0.8rem;">✓ WhatsApp</span>
             </div>`;
         }).join('');
     }
@@ -2712,6 +2766,7 @@
         deleteIngredient, deleteRecipe, switchCalcTab,
         deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
         deleteCaixa,
+        toggleAllMktContacts, updateMktCount: updateMktSelectedCount,
         askAI,
     };
 
