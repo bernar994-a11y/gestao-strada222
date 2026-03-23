@@ -1509,6 +1509,7 @@
     function sendCampaignWhatsApp() {
         const title = $('#campaignTitle').value.trim();
         const msg = $('#campaignMessage').value.trim();
+        const imgUrl = $('#campaignImage') ? $('#campaignImage').value.trim() : '';
         if (!title || !msg) { showToast('⚠ Preencha título e mensagem'); return; }
 
         const selectedIds = [...document.querySelectorAll('.mkt-contact-check:checked')].map(c => c.dataset.contactId);
@@ -1524,7 +1525,10 @@
             return;
         }
 
-        const fullMessage = `*${title}*\n\n${msg}`;
+        let fullMessage = `*${title}*\n\n${msg}`;
+        if (imgUrl) {
+            fullMessage += `\n\n📷 Imagem anexa: ${imgUrl}`;
+        }
         const encoded = encodeURIComponent(fullMessage);
 
         recipients.forEach((contact, idx) => {
@@ -1536,7 +1540,7 @@
         });
 
         state.campaigns.unshift({
-            id: 'camp_' + Date.now(), title, message: msg,
+            id: 'camp_' + Date.now(), title, message: msg, imageUrl: imgUrl,
             recipientCount: recipients.length, sentAt: new Date().toISOString(),
             sentBy: currentUser ? currentUser.name : 'Sistema',
         });
@@ -1547,6 +1551,18 @@
     }
 
     function sendCampaign() { sendCampaignWhatsApp(); }
+
+    window.GestaoStrada.reuseCampaign = function(id) {
+        const camp = state.campaigns.find(c => c.id === id);
+        if (!camp) return;
+        $('#campaignTitle').value = camp.title;
+        $('#campaignMessage').value = camp.message;
+        if ($('#campaignImage') && camp.imageUrl) {
+            $('#campaignImage').value = camp.imageUrl;
+        }
+        showToast('Campanha carregada no formulário!');
+        $('#campaignTitle').focus();
+    };
 
     function renderCampaigns() {
         const list = $('#campaignsList');
@@ -1559,13 +1575,20 @@
         list.innerHTML = state.campaigns.map((c, i) => {
             const d = new Date(c.sentAt);
             const dateStr = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            return `<div class="entry-item" style="animation-delay:${i * 0.03}s">
+            return `<div class="entry-item" style="animation-delay:${i * 0.03}s;align-items:center;">
                 <div class="entry-color" style="background:#25D366"></div>
                 <div class="entry-info">
                     <div class="entry-desc">${esc(c.title)}</div>
-                    <div class="entry-meta"><span>📤 ${c.recipientCount} destinatário(s)</span><span class="dot"></span><span>${dateStr}</span><span class="dot"></span><span>por ${esc(c.sentBy)}</span></div>
+                    <div class="entry-meta">
+                        <span>📤 ${c.recipientCount} destinatário(s)</span><span class="dot"></span>
+                        <span>${dateStr}</span><span class="dot"></span>
+                        <span>por ${esc(c.sentBy)}</span>
+                    </div>
                 </div>
-                <span class="entry-value" style="color:#25D366;font-size:0.8rem;">✓ WhatsApp</span>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem">
+                    <span class="entry-value" style="color:#25D366;font-size:0.8rem;">✓ WhatsApp</span>
+                    <button type="button" class="btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.7rem;" onclick="GestaoStrada.reuseCampaign('${c.id}')">🔄 Reutilizar</button>
+                </div>
             </div>`;
         }).join('');
     }
