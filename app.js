@@ -364,6 +364,15 @@
         CAIXA_PREFIX: 'gestao_strada_caixa_',
     };
 
+    function getStoredEmployees() {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
     let state = {
         currentUnit: null,
         costs: [],
@@ -508,14 +517,8 @@
             const username = authUser.value.trim().toLowerCase();
             const password = authPass.value;
             const user = VALID_USERS.find(u => u.username === username && u.password === password);
-            // Also check employees (safely, as old data might be corrupted string like "[object Object]")
-            let employees = [];
-            try {
-                employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
-            } catch (e) {
-                console.warn('⚠️ Corrupted employees data in localStorage:', e);
-                localStorage.removeItem(STORAGE_KEYS.EMPLOYEES); // Clear the corrupt data
-            }
+            // Also check employees (safely handles any corrupted array or old object data)
+            const employees = getStoredEmployees();
             const emp = employees.find(u => u.username === username && u.password === password);
 
             if (user) {
