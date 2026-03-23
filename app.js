@@ -2814,10 +2814,24 @@
     // Boot
     // ==========================================
     async function boot() {
+        console.log('boot() called');
         cacheEls();
-        if (typeof loadEmployeesFromSupabase === 'function') await loadEmployeesFromSupabase();
+        console.log('cacheEls() done');
+        if (typeof loadEmployeesFromSupabase === 'function') {
+            console.log('calling loadEmployeesFromSupabase');
+            try {
+                // timeout protection if supabase hangs
+                const timeout = new Promise((_, reject) => setTimeout(() => reject('timeout'), 5000));
+                await Promise.race([loadEmployeesFromSupabase(), timeout]);
+            } catch (err) {
+                console.warn('loadEmployeesFromSupabase failed or timed out:', err);
+            }
+        }
+        console.log('calling setupAuth');
         setupAuth();
+        console.log('setupAuth done');
         checkAutoLogin();
+        console.log('boot() finished');
     }
 
     // Extend showApp to setup new features
