@@ -292,12 +292,20 @@
         if (!supabase) return false;
         try {
             const { data, error } = await supabase
-                .from('app_data')
-                .select('*')
-                .eq('unit_id', 'employees')
-                .single();
+                .from('funcionarios')
+                .select('*');
             if (error || !data) return false;
-            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, data.costs || '[]');
+            
+            const employees = data.map(emp => ({
+                id: emp.id,
+                name: emp.name,
+                role: emp.role || 'Funcionário',
+                username: emp.username,
+                password: emp.password,
+                allowedUnit: emp.allowed_unit || 'all'
+            }));
+
+            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
             console.log('✅ Funcionários carregados do Supabase');
             return true;
         } catch (e) {
