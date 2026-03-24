@@ -2058,14 +2058,13 @@
                         statusText = `Vence em ${diffDays}d`;
                     }
                     const paidDateStr = p.paid && p.paymentDate ? ` ${formatDate(p.paymentDate)}` : '';
-                    const paidValueStr = p.paid && p.paidValue != null ? `<span class="parcela-paid-value" style="color:#10B981;font-weight:600;font-size:0.7rem;margin-left:4px">Pago: ${formatCurrency(p.paidValue)}</span>` : '';
+                    const displayValue = p.paid && p.paidValue != null ? p.paidValue : p.value;
                     return `<div class="parcela-item ${statusClass}">
                         <div class="parcela-info">
                             <span class="parcela-num">${p.number}ª</span>
                             <span class="parcela-date">${formatDate(p.dueDate)}</span>
-                            <span class="parcela-valor">${formatCurrency(p.value)}</span>
+                            <span class="parcela-valor">${formatCurrency(displayValue)}</span>
                             <span class="parcela-status-badge">${statusText}${paidDateStr}</span>
-                            ${paidValueStr}
                         </div>
                         <button class="parcela-toggle" onclick="event.stopPropagation(); GestaoStrada.toggleParcelaPaid('${carne.id}', ${p.number})" title="${p.paid ? 'Desmarcar' : 'Registrar pagamento'}">
                             ${p.paid ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>'}
