@@ -3,15 +3,6 @@
    Gestão Strada — Application Logic
    ======================================== */
 
-window.addEventListener('error', function(e) {
-    document.body.innerHTML += '<div style="position:fixed;top:10%;left:10%;right:10%;background:red;color:white;z-index:9999;padding:20px;font-size:24px;">' +
-        'CRITICAL ERRROR: ' + e.message + '<br>Line: ' + e.lineno + ' Col: ' + e.colno + '<br>File: ' + e.filename + '</div>';
-});
-window.addEventListener('unhandledrejection', function(e) {
-    document.body.innerHTML += '<div style="position:fixed;top:30%;left:10%;right:10%;background:red;color:white;z-index:9999;padding:20px;font-size:24px;">' +
-        'PROMISE ERRROR: ' + e.reason + '</div>';
-});
-
 (function () {
     'use strict';
 
@@ -1570,18 +1561,6 @@ window.addEventListener('unhandledrejection', function(e) {
 
     function sendCampaign() { sendCampaignWhatsApp(); }
 
-    window.GestaoStrada.reuseCampaign = function(id) {
-        const camp = state.campaigns.find(c => c.id === id);
-        if (!camp) return;
-        $('#campaignTitle').value = camp.title;
-        $('#campaignMessage').value = camp.message;
-        if ($('#campaignImage') && camp.imageUrl) {
-            $('#campaignImage').value = camp.imageUrl;
-        }
-        showToast('Campanha carregada no formulário!');
-        $('#campaignTitle').focus();
-    };
-
     function renderCampaigns() {
         const list = $('#campaignsList');
         if (!list) return;
@@ -2817,30 +2796,28 @@ window.addEventListener('unhandledrejection', function(e) {
         deleteCaixa,
         toggleAllMktContacts, updateMktCount: updateMktSelectedCount,
         askAI,
+        reuseCampaign: function(id) {
+            const camp = state.campaigns.find(c => c.id === id);
+            if (!camp) return;
+            $('#campaignTitle').value = camp.title;
+            $('#campaignMessage').value = camp.message;
+            if ($('#campaignImage') && camp.imageUrl) {
+                $('#campaignImage').value = camp.imageUrl;
+            }
+            showToast('Campanha carregada no formulário!');
+            $('#campaignTitle').focus();
+            navigateToPanel(7);
+        }
     };
 
     // ==========================================
     // Boot
     // ==========================================
     async function boot() {
-        console.log('boot() called');
         cacheEls();
-        console.log('cacheEls() done');
-        if (typeof loadEmployeesFromSupabase === 'function') {
-            console.log('calling loadEmployeesFromSupabase');
-            try {
-                // timeout protection if supabase hangs
-                const timeout = new Promise((_, reject) => setTimeout(() => reject('timeout'), 5000));
-                await Promise.race([loadEmployeesFromSupabase(), timeout]);
-            } catch (err) {
-                console.warn('loadEmployeesFromSupabase failed or timed out:', err);
-            }
-        }
-        console.log('calling setupAuth');
+        if (typeof loadEmployeesFromSupabase === 'function') await loadEmployeesFromSupabase();
         setupAuth();
-        console.log('setupAuth done');
         checkAutoLogin();
-        console.log('boot() finished');
     }
 
     // Extend showApp to setup new features
