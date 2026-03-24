@@ -270,7 +270,7 @@
     async function saveEmployeesToSupabase() {
         if (!supabase) return;
         try {
-            const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+            const employees = getStoredEmployees();
             const payload = employees.map(emp => ({
                 id: emp.id,
                 name: emp.name,
@@ -507,6 +507,8 @@
         const authPass = $('#authPass');
         const authError = $('#authError');
         const togglePass = $('#togglePass');
+
+        if (!authForm || !authUser || !authPass) return;
 
         if (togglePass) {
             togglePass.addEventListener('click', () => {
@@ -1803,7 +1805,7 @@
         const password = $('#empPass').value;
         const allowedUnit = ($('#empUnit') || {}).value || 'all';
         if (!name || !username || !password) { showToast('⚠ Preencha todos os campos obrigatórios'); return; }
-        const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+        const employees = getStoredEmployees();
         if (employees.some(e => e.username === username) || VALID_USERS.some(u => u.username === username)) {
             showToast('⚠ Usuário já existe'); return;
         }
@@ -1816,7 +1818,7 @@
 
     function deleteEmployee(id) {
         showModal('Deseja excluir este funcionário?', () => {
-            let employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+            let employees = getStoredEmployees();
             employees = employees.filter(e => e.id !== id);
             localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
             saveEmployeesToSupabase();
@@ -1828,7 +1830,7 @@
     function renderEmployees() {
         const list = $('#employeesList');
         if (!list) return;
-        const employees = JSON.parse(localStorage.getItem(STORAGE_KEYS.EMPLOYEES) || '[]');
+        const employees = getStoredEmployees();
         if (employees.length === 0) {
             list.innerHTML = '<div class="empty-state"><p>Nenhum funcionário cadastrado</p></div>';
             return;
