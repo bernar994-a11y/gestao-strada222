@@ -224,23 +224,31 @@
             }
 
             if (carnesData) {
-                state.carnes = carnesData.map(c => ({
-                    id: c.id,
-                    nome: c.name,
-                    telefone: c.phone,
-                    endereco: c.address,
-                    valorTotal: c.valor_total || 0,
-                    entrada: c.entrada || 0,
-                    installments: (c.carnes_parcelas || []).map(p => ({
-                        id: p.id,
-                        number: p.installment_number,
-                        value: p.value,
-                        dueDate: p.due_date,
-                        paid: p.paid,
-                        paymentDate: p.payment_date,
-                        paidValue: p.paid_value || null
-                    }))
-                }));
+                state.carnes = carnesData.map(c => {
+                    const parcels = c.carnes_parcelas || [];
+                    const computedTotal = parcels.reduce((sum, p) => sum + (p.value || 0), 0) + (c.entrada || 0);
+                    const valorTotal = c.valor_total && c.valor_total > 0 ? c.valor_total : computedTotal;
+                    const valorParcela = parcels.length > 0 ? parcels[0].value : 0;
+                    
+                    return {
+                        id: c.id,
+                        nome: c.name,
+                        telefone: c.phone,
+                        endereco: c.address,
+                        valorTotal: valorTotal,
+                        entrada: c.entrada || 0,
+                        valorParcela: valorParcela,
+                        installments: parcels.map(p => ({
+                            id: p.id,
+                            number: p.installment_number,
+                            value: p.value,
+                            dueDate: p.due_date,
+                            paid: p.paid,
+                            paymentDate: p.payment_date,
+                            paidValue: p.paid_value || null
+                        }))
+                    };
+                });
             }
 
             if (typeof caixaData !== 'undefined' && caixaData) {
