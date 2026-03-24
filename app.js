@@ -287,6 +287,15 @@
             console.warn('Supabase employees sync error:', e);
         }
     }
+
+    async function deleteEmployeeSupabase(id) {
+        if (!supabase) return;
+        try {
+            await supabase.from('funcionarios').delete().eq('id', id);
+        } catch (e) {
+            console.warn('Erro ao excluir funcionário no Supabase:', e);
+        }
+    }
     
     async function loadEmployeesFromSupabase() {
         if (!supabase) return false;
@@ -1821,7 +1830,7 @@
             let employees = getStoredEmployees();
             employees = employees.filter(e => e.id !== id);
             localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-            saveEmployeesToSupabase();
+            deleteEmployeeSupabase(id);
             renderEmployees();
             showToast('Funcionário excluído');
         });
