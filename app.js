@@ -468,6 +468,9 @@
             costKg: $('#costKg'),
             kgFieldGroup: $('#kgFieldGroup'),
             allEntries: $('#allEntries'),
+            filterDateFrom: $('#filterDateFrom'),
+            filterDateTo: $('#filterDateTo'),
+            filterCategory: $('#filterCategory'),
             // Categories
             categoryForm: $('#categoryForm'),
             catName: $('#catName'),
@@ -1118,11 +1121,26 @@
     }
 
     function renderAllEntries() {
-        if (state.costs.length === 0) {
-            els.allEntries.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Nenhum lançamento registrado</p></div>`;
+        let filtered = [...state.costs];
+
+        if (els.filterDateFrom && els.filterDateFrom.value) {
+            filtered = filtered.filter(c => c.date >= els.filterDateFrom.value);
+        }
+        if (els.filterDateTo && els.filterDateTo.value) {
+            filtered = filtered.filter(c => c.date <= els.filterDateTo.value);
+        }
+        if (els.filterCategory && els.filterCategory.value) {
+            filtered = filtered.filter(c => c.categoryId === els.filterCategory.value);
+        }
+
+        // Ordenar do mais novo para o mais velho (descendente por data)
+        filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (filtered.length === 0) {
+            els.allEntries.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Nenhum lançamento encontrado</p></div>`;
             return;
         }
-        els.allEntries.innerHTML = state.costs.map((c, i) => renderEntryItem(c, i, true)).join('');
+        els.allEntries.innerHTML = filtered.map((c, i) => renderEntryItem(c, i, true)).join('');
     }
 
     function renderEntryItem(cost, idx, showDelete) {
@@ -1154,8 +1172,9 @@
 
     function renderCategorySelects() {
         const opts = state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-        els.costCategory.innerHTML = `<option value="">Selecione uma categoria</option>${opts}`;
-        els.exportCategory.innerHTML = `<option value="">Todas as categorias</option>${opts}`;
+        if (els.costCategory) els.costCategory.innerHTML = `<option value="">Selecione uma categoria</option>${opts}`;
+        if (els.exportCategory) els.exportCategory.innerHTML = `<option value="">Todas as categorias</option>${opts}`;
+        if (els.filterCategory) els.filterCategory.innerHTML = `<option value="">Todas as categorias</option>${opts}`;
     }
 
     function renderCategories() {
@@ -2814,6 +2833,11 @@
     // ==========================================
     async function boot() {
         cacheEls();
+        
+        if (els.filterDateFrom) els.filterDateFrom.addEventListener('change', renderAllEntries);
+        if (els.filterDateTo) els.filterDateTo.addEventListener('change', renderAllEntries);
+        if (els.filterCategory) els.filterCategory.addEventListener('change', renderAllEntries);
+
         if (typeof loadEmployeesFromSupabase === 'function') await loadEmployeesFromSupabase();
         setupAuth();
         checkAutoLogin();

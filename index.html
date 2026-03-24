@@ -441,6 +441,22 @@
                         </form>
                         <div class="section-block" style="margin-top: 2rem;">
                             <h3 class="section-title">Todos os Lançamentos</h3>
+                            <div class="filter-bar" style="display:flex; gap:1rem; margin-bottom: 1.5rem; flex-wrap: wrap; background: rgba(255,255,255,0.02); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                                <div class="form-group" style="flex:1; min-width: 150px; margin:0">
+                                    <label for="filterDateFrom" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem;">Data Início</label>
+                                    <input type="date" id="filterDateFrom" style="padding: 0.6rem;">
+                                </div>
+                                <div class="form-group" style="flex:1; min-width: 150px; margin:0">
+                                    <label for="filterDateTo" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem;">Data Fim</label>
+                                    <input type="date" id="filterDateTo" style="padding: 0.6rem;">
+                                </div>
+                                <div class="form-group" style="flex:2; min-width: 200px; margin:0">
+                                    <label for="filterCategory" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.3rem;">Categoria</label>
+                                    <select id="filterCategory" style="padding: 0.6rem;">
+                                        <option value="">Todas as categorias</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="entries-list" id="allEntries">
                                 <div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" stroke-width="1.5">
