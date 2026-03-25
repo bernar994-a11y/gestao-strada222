@@ -48,7 +48,8 @@
                     kg: cost.kg || 0,
                     due_date: cost.dueDate || null,
                     paid: cost.paid,
-                    unit_id: state.currentUnit
+                    unit_id: state.currentUnit,
+                    note_number: cost.noteNumber || null
                 }, { onConflict: 'id' });
             if (error) console.warn('Supabase save error:', error.message);
         } catch (e) {
@@ -211,7 +212,8 @@
                     notes: c.notes,
                     kg: c.kg,
                     dueDate: c.due_date,
-                    paid: c.paid
+                    paid: c.paid,
+                    noteNumber: c.note_number
                 }));
             }
 
@@ -485,6 +487,7 @@
             costKg: $('#costKg'),
             kgFieldGroup: $('#kgFieldGroup'),
             allEntries: $('#allEntries'),
+            costNoteNumber: $('#costNoteNumber'),
             filterDateFrom: $('#filterDateFrom'),
             filterDateTo: $('#filterDateTo'),
             filterCategory: $('#filterCategory'),
@@ -835,6 +838,12 @@
             return;
         }
 
+        const noteNumber = els.costNoteNumber ? els.costNoteNumber.value.trim() : '';
+        if (noteNumber && state.costs.some(c => c.noteNumber === noteNumber)) {
+            showToast(`⚠ Já existe um lançamento com a nota Nº ${noteNumber}`);
+            return;
+        }
+
         const cost = {
             id: 'cost_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
             desc: desc,
@@ -845,7 +854,8 @@
             notes: notes,
             kg: kg,
             dueDate: dueDate || null,
-            paid: dueDate ? false : true
+            paid: dueDate ? false : true,
+            noteNumber: noteNumber
         };
 
         state.costs.unshift(cost);
@@ -1181,6 +1191,7 @@
                     <span class="dot"></span>
                     <span>${esc(catName)}</span>
                     ${cost.costCenter ? `<span class="dot"></span><span>${esc(cost.costCenter)}</span>` : ''}
+                    ${cost.noteNumber ? `<span class="dot"></span><span>Nota: ${esc(cost.noteNumber)}</span>` : ''}
                     ${kgBadge}
                 </div>
             </div>
@@ -1260,6 +1271,7 @@
         date: 'Data',
         category: 'Categoria',
         center: 'Centro de Custo',
+        noteNumber: 'Nº Nota',
         notes: 'Observações',
         kg: 'Peso (KG)',
     };
@@ -1274,6 +1286,7 @@
                 case 'date': row[COLUMN_LABELS[col]] = formatDate(cost.date); break;
                 case 'category': row[COLUMN_LABELS[col]] = cat ? cat.name : 'Sem categoria'; break;
                 case 'center': row[COLUMN_LABELS[col]] = cost.center || ''; break;
+                case 'noteNumber': row[COLUMN_LABELS[col]] = cost.noteNumber || ''; break;
                 case 'notes': row[COLUMN_LABELS[col]] = cost.notes || ''; break;
                 case 'kg': row[COLUMN_LABELS[col]] = cost.kg != null ? cost.kg : ''; break;
             }
