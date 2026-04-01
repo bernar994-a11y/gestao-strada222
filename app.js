@@ -977,12 +977,11 @@
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
         const monthTotal = monthCosts.reduce((s, c) => s + c.value, 0);
-        const avg = state.costs.length > 0 ? total / state.costs.length : 0;
-
-        animateValue(els.totalGeral, formatCurrency(total));
+        animateValue(els.totalGeral, formatCurrency(monthTotal));
         animateValue(els.totalMes, formatCurrency(monthTotal));
-        animateValue(els.totalLancamentos, state.costs.length.toString());
-        animateValue(els.mediaCusto, formatCurrency(avg));
+        animateValue(els.totalLancamentos, monthCosts.length.toString());
+        const monthAvg = monthCosts.length > 0 ? monthTotal / monthCosts.length : 0;
+        animateValue(els.mediaCusto, formatCurrency(monthAvg));
 
         // Contas a Receber (from carnê - unpaid installments)
         const contasReceberEl = $('#contasReceber');
@@ -1005,8 +1004,8 @@
             animateValue(contasPagarEl, formatCurrency(totalPagar));
         }
 
-        renderCategoryBars(total);
-        renderRecentEntries();
+        renderCategoryBars(monthTotal, monthCosts);
+        renderRecentEntries(monthCosts);
         renderContasPagarList();
 
         // Dynamic KPIs
@@ -1014,10 +1013,10 @@
         if (kpiRow) {
             const kpis = [];
 
-            // Top Category
-            if (state.costs.length > 0) {
+            // Top Category (Month)
+            if (monthCosts.length > 0) {
                 const catTotals = {};
-                state.costs.forEach(c => {
+                monthCosts.forEach(c => {
                     const cat = state.categories.find(cat => cat.id === c.categoryId);
                     const name = cat ? cat.name : 'Sem categoria';
                     catTotals[name] = (catTotals[name] || 0) + c.value;
@@ -1034,13 +1033,11 @@
             const last30Total = last30.reduce((s, c) => s + c.value, 0);
             kpis.push({ icon: '📆', label: 'Últimos 30 dias', value: formatCurrency(last30Total), sub: `${last30.length} lançamento(s)` });
 
-            // Daily average
-            if (state.costs.length > 0) {
-                const dates = state.costs.map(c => new Date(c.date).getTime());
-                const minDate = new Date(Math.min(...dates));
-                const daySpan = Math.max(1, Math.ceil((now - minDate) / (1000 * 60 * 60 * 24)));
-                const dailyAvg = total / daySpan;
-                kpis.push({ icon: '⚡', label: 'Média Diária', value: formatCurrency(dailyAvg), sub: `em ${daySpan} dia(s)` });
+            // Daily average (Month)
+            if (monthCosts.length > 0) {
+                const daySpan = now.getDate(); // Days elapsed in current month
+                const dailyAvg = monthTotal / daySpan;
+                kpis.push({ icon: '⚡', label: 'Média Diária', value: formatCurrency(dailyAvg), sub: `em ${daySpan} dia(s) deste mês` });
             }
 
             // Month trend
@@ -1104,14 +1101,14 @@
         }
     }
 
-    function renderCategoryBars(total) {
-        if (state.costs.length === 0) {
-            els.categoryBars.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><p>Nenhum lançamento ainda</p></div>`;
+    function renderCategoryBars(total, costs = state.costs) {
+        if (costs.length === 0) {
+            els.categoryBars.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><p>Nenhum lançamento no período</p></div>`;
             return;
         }
 
         const catTotals = {};
-        state.costs.forEach(c => { catTotals[c.categoryId] = (catTotals[c.categoryId] || 0) + c.value; });
+        costs.forEach(c => { catTotals[c.categoryId] = (catTotals[c.categoryId] || 0) + c.value; });
         const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
 
         els.categoryBars.innerHTML = sorted.map(([catId, catTotal], idx) => {
@@ -1140,8 +1137,8 @@
         });
     }
 
-    function renderRecentEntries() {
-        const recent = state.costs.slice(0, 5);
+    function renderRecentEntries(costs = state.costs) {
+        const recent = costs.slice(0, 5);
         if (recent.length === 0) {
             els.recentEntries.innerHTML = `<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><p>Adicione seu primeiro custo</p></div>`;
             return;
