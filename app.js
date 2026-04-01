@@ -2084,7 +2084,9 @@
 
         function buildCarneCard(carne, i) {
             const paidCount = carne.installments.filter(p => p.paid).length;
-            const progress = (paidCount / carne.installments.length) * 100;
+            const totalPaid = (carne.entrada || 0) + carne.installments
+                .filter(p => p.paid)
+                .reduce((sum, p) => sum + (p.paidValue || p.value), 0);
             const isExpanded = !!window._carneExpanded[carne.id];
             const allPaid = paidCount === carne.installments.length;
 
@@ -2136,7 +2138,8 @@
                     </div>
                     <div class="carne-collapsed-stats">
                         <span class="carne-collapsed-paid">${paidCount}/${carne.installments.length}</span>
-                        <span class="carne-collapsed-value">${formatCurrency(carne.valorTotal)}</span>
+                        <span class="carne-collapsed-value" style="color:#10B981; font-weight:600;">${formatCurrency(totalPaid)}</span>
+                        <span class="carne-collapsed-total" style="font-size:0.75rem; color:var(--text-muted);">/ ${formatCurrency(carne.valorTotal)}</span>
                     </div>
                     <button class="carne-delete-btn" onclick="event.stopPropagation(); GestaoStrada.deleteCarne('${carne.id}')" title="Excluir carnê">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -2151,8 +2154,9 @@
                                 ${carne.endereco ? `<span class="dot"></span><span>📍 ${esc(carne.endereco)}</span>` : ''}
                             </div>
                             <div class="carne-meta" style="margin-top:0.3rem">
-                                <span>💰 Total: ${formatCurrency(carne.valorTotal || 0)}</span>
-                                ${carne.entrada ? `<span class="dot"></span><span>📥 Entrada: ${formatCurrency(carne.entrada)}</span>` : ''}
+                                <span style="color:#10B981; font-weight:700;">✅ Total Pago: ${formatCurrency(totalPaid)}</span>
+                                <span class="dot"></span><span>💰 Total: ${formatCurrency(carne.valorTotal || 0)}</span>
+                                <span class="dot"></span><span>📥 Entrada: ${formatCurrency(carne.entrada)}</span>
                                 <span class="dot"></span><span>📋 Parcela: ${formatCurrency(carne.valorParcela || 0)}</span>
                             </div>
                         </div>
