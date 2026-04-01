@@ -2541,107 +2541,129 @@
 
     function generateAIResponse(question) {
         const q = question.toLowerCase();
-        const total = state.costs.reduce((s, c) => s + c.value, 0);
         const now = new Date();
-        const monthCosts = state.costs.filter(c => {
-            const d = new Date(c.date);
-            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-        const monthTotal = monthCosts.reduce((s, c) => s + c.value, 0);
+        let targetMonth = now.getMonth();
+        let targetYear = now.getFullYear();
+        let periodLabel = "deste mês";
 
-        // Category analysis
-        const catTotals = {};
-        state.costs.forEach(c => {
-            const cat = state.categories.find(cat => cat.id === c.categoryId);
-            const name = cat ? cat.name : 'Outros';
-            catTotals[name] = (catTotals[name] || 0) + c.value;
-        });
-        const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-
-        // Monthly analysis
-        const monthMap = {};
-        state.costs.forEach(c => {
-            const d = new Date(c.date);
-            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            monthMap[key] = (monthMap[key] || 0) + c.value;
-        });
-        const monthKeys = Object.keys(monthMap).sort();
-
-        // Carnê analysis
-        const totalReceber = (state.carnes || []).reduce((s, c) => s + c.installments.filter(p => !p.paid).reduce((s2, p) => s2 + p.value, 0), 0);
-
-        if (q.includes('resum') || q.includes('geral') || q.includes('visão')) {
-            return `📊 <strong>Resumo Geral:</strong><br>
-                • Total acumulado: <strong>${formatCurrency(total)}</strong><br>
-                • Este mês: <strong>${formatCurrency(monthTotal)}</strong> (${monthCosts.length} lançamentos)<br>
-                • ${state.costs.length} custos registrados em ${monthKeys.length} mês(es)<br>
-                • Contas a receber: <strong>${formatCurrency(totalReceber)}</strong><br>
-                ${topCats.length > 0 ? `• Maior categoria: <strong>${topCats[0][0]}</strong> (${formatCurrency(topCats[0][1])})` : ''}`;
+        // 1. Detect Period
+        const months_br = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+        const monthMatch = months_br.find(m => q.includes(m));
+        
+        if (q.includes('mês passado') || q.includes('mes passado')) {
+            const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            targetMonth = d.getMonth();
+            targetYear = d.getFullYear();
+            periodLabel = "do mês passado (" + months_br[targetMonth] + ")";
+        } else if (monthMatch) {
+            targetMonth = months_br.indexOf(monthMatch);
+            periodLabel = "de " + monthMatch;
+            // Assume current year if not specified
         }
 
-        if (q.includes('categor') || q.includes('maior') || q.includes('gasta')) {
-            if (topCats.length === 0) return 'Nenhum custo registrado ainda para analisar.';
-            let resp = '🏷️ <strong>Análise por Categoria:</strong><br>';
-            topCats.slice(0, 5).forEach((c, i) => {
-                const pct = total > 0 ? (c[1] / total * 100).toFixed(1) : 0;
-                resp += `${i + 1}. <strong>${c[0]}</strong>: ${formatCurrency(c[1])} (${pct}%)<br>`;
+        // 2. Filter Data by Period
+        const periodCosts = state.costs.filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+        });
+        const periodCaixa = (state.caixa || []).filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+        });
+
+        const totalCosts = periodCosts.reduce((s, c) => s + c.value, 0);
+        const totalCaixaRaw = periodCaixa.reduce((s, c) => s + c.value, 0);
+        const totalDif = periodCaixa.reduce((s, c) => s + (c.diferenca || 0), 0);
+        const totalCaixaReal = totalCaixaRaw + totalDif;
+        const profit = totalCaixaReal - totalCosts;
+
+        // 3. Question Logic
+        
+        // --- WHO CLOSED THE BOX ---
+        if (q.includes('quem') && (q.includes('caixa') || q.includes('fechou'))) {
+            if (periodCaixa.length === 0) return `Não encontrei registros de caixa ${periodLabel}.`;
+            
+            // Try to find names in obs field
+            const closers = periodCaixa
+                .filter(c => c.obs && c.obs.toLowerCase().includes('por'))
+                .map(c => {
+                    const date = formatDate_PT(c.date);
+                    return `• ${date} (${c.turno}): ${esc(c.obs)}`;
+                });
+            
+            if (closers.length > 0) {
+                return `👤 <strong>Quem fechou o caixa ${periodLabel}:</strong><br>` + closers.slice(0, 10).join('<br>') + (closers.length > 10 ? '<br>...e outros.' : '');
+            } else {
+                return `Encontrei ${periodCaixa.length} fechamentos ${periodLabel}, mas as observações não especificam nomes. <br>💡 <em>Dica: Sempre escreva "Fechado por [Nome]" nas observações do caixa.</em>`;
+            }
+        }
+
+        // --- SUMMARY / PROFIT ---
+        if (q.includes('resum') || q.includes('balanço') || q.includes('como foi') || q.includes('lucro')) {
+            const statusColor = profit >= 0 ? '#10B981' : '#EF4444';
+            return `📊 <strong>Resumo Financeiro ${periodLabel}:</strong><br><br>
+                • Entradas de Caixa: <strong>${formatCurrency(totalCaixaReal)}</strong><br>
+                • Total de Despesas: <strong>${formatCurrency(totalCosts)}</strong><br>
+                • Saldo/Lucro: <strong style="color:${statusColor}">${formatCurrency(profit)}</strong><br>
+                • Diferença Total (Quebras): <span style="color:${totalDif < 0 ? '#EF4444' : '#10B981'}">${formatCurrency(totalDif)}</span><br>
+                <br>💰 <em>No total, foram ${periodCosts.length} despesas e ${periodCaixa.length} fechamentos de caixa.</em>`;
+        }
+
+        // --- CATEGORY ANALYSIS ---
+        if (q.includes('categor') || q.includes('gasta') || q.includes('maior despesa')) {
+            const catTotals = {};
+            periodCosts.forEach(c => {
+                const cat = state.categories.find(cat => cat.id === c.categoryId);
+                const name = cat ? cat.name : 'Outros';
+                catTotals[name] = (catTotals[name] || 0) + c.value;
             });
-            if (topCats.length > 0) {
-                resp += `<br>💡 <em>A categoria "${topCats[0][0]}" representa a maior parte dos custos. Considere negociar melhores preços ou encontrar alternativas nessa área.</em>`;
-            }
+            const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+            
+            if (sorted.length === 0) return `Não há despesas registradas ${periodLabel}.`;
+            
+            let resp = `🏷️ <strong>Maiores Gastos ${periodLabel}:</strong><br>`;
+            sorted.slice(0, 5).forEach((c, i) => {
+                resp += `${i+1}. <strong>${c[0]}</strong>: ${formatCurrency(c[1])}<br>`;
+            });
             return resp;
         }
 
-        if (q.includes('tendên') || q.includes('evolu') || q.includes('mês') || q.includes('mensal')) {
-            if (monthKeys.length < 2) return 'Preciso de pelo menos 2 meses de dados para analisar tendências.';
-            const last = monthMap[monthKeys[monthKeys.length - 1]];
-            const prev = monthMap[monthKeys[monthKeys.length - 2]];
-            const change = prev > 0 ? ((last - prev) / prev * 100) : 0;
-            const avgMonthly = total / monthKeys.length;
-            return `📈 <strong>Análise de Tendência:</strong><br>
-                • Último mês: ${formatCurrency(last)}<br>
-                • Mês anterior: ${formatCurrency(prev)}<br>
-                • Variação: <strong style="color:${change > 0 ? '#EF4444' : '#10B981'}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</strong><br>
-                • Média mensal: ${formatCurrency(avgMonthly)}<br>
-                ${change > 5 ? '<br>⚠️ <em>Os custos estão subindo! Revise os gastos recentes para identificar onde economizar.</em>' : change < -5 ? '<br>✅ <em>Bom trabalho! Os custos estão diminuindo.</em>' : '<br>➡️ <em>Os custos estão estáveis.</em>'}`;
+        // --- TRENDS ---
+        if (q.includes('tendên') || q.includes('evolu') || q.includes('compar')) {
+            const lastMonthD = new Date(targetYear, targetMonth - 1, 1);
+            const prevCosts = state.costs.filter(c => {
+                const d = new Date(c.date + 'T12:00:00');
+                return d.getMonth() === lastMonthD.getMonth() && d.getFullYear() === lastMonthD.getFullYear();
+            }).reduce((s, c) => s + c.value, 0);
+            
+            if (prevCosts === 0) return "Não tenho dados suficientes do mês anterior para comparar.";
+            
+            const diff = totalCosts - prevCosts;
+            const pct = (diff / prevCosts * 100).toFixed(1);
+            const isUp = diff > 0;
+            
+            return `📈 <strong>Comparativo de Despesas:</strong><br>
+                • Este período: ${formatCurrency(totalCosts)}<br>
+                • Período anterior: ${formatCurrency(prevCosts)}<br>
+                • Variação: <strong style="color:${isUp ? '#EF4444' : '#10B981'}">${isUp ? '+' : ''}${pct}%</strong><br>
+                <br>${isUp ? '⚠️ Seus custos subiram. Revise as categorias de maior peso.' : '✅ Excelente! Seus custos diminuíram em relação ao mês anterior.'}`;
         }
 
-        if (q.includes('econom') || q.includes('dica') || q.includes('reduzir') || q.includes('sugestão') || q.includes('ajuda')) {
-            let resp = '💡 <strong>Dicas para Economia:</strong><br>';
-            if (topCats.length > 0) {
-                resp += `1. <strong>${topCats[0][0]}</strong> é sua maior despesa (${formatCurrency(topCats[0][1])}). Pesquise fornecedores alternativos.<br>`;
-            }
-            if (monthKeys.length >= 2) {
-                const vals = monthKeys.map(k => monthMap[k]);
-                const maxMonth = Math.max(...vals);
-                const maxIdx = vals.indexOf(maxMonth);
-                resp += `2. O mês mais caro foi ${monthKeys[maxIdx]} (${formatCurrency(maxMonth)}). Analise o que aconteceu.<br>`;
-            }
-            resp += `3. Defina um orçamento mensal e monitore semanalmente.<br>`;
-            resp += `4. Negocie compras recorrentes em volume para obter descontos.<br>`;
-            if (totalReceber > 0) {
-                resp += `5. Você tem ${formatCurrency(totalReceber)} a receber em carnês. Cobre os inadimplentes.`;
-            }
-            return resp;
+        // --- DEFAULTS ---
+        if (q.includes('dica') || q.includes('econom') || q.includes('ajuda')) {
+            return `💡 <strong>Sugestões para ${periodLabel}:</strong><br>
+                1. Monitore a quebra de caixa (atual: ${formatCurrency(totalDif)}).<br>
+                2. Verifique se o lucro de ${formatCurrency(profit)} atende sua meta.<br>
+                3. Negocie prazos com fornecedores das 3 maiores categorias.<br>
+                4. Use o módulo de Carnês para prever as próximas entradas.`;
         }
 
-        if (q.includes('carn') || q.includes('receber') || q.includes('devedor')) {
-            const total_carnes = (state.carnes || []).length;
-            const quitados = (state.carnes || []).filter(c => c.installments.every(p => p.paid)).length;
-            return `📋 <strong>Análise de Carnês:</strong><br>
-                • Total de carnês: <strong>${total_carnes}</strong><br>
-                • Quitados: <strong>${quitados}</strong><br>
-                • Pendentes: <strong>${total_carnes - quitados}</strong><br>
-                • A receber: <strong>${formatCurrency(totalReceber)}</strong>`;
-        }
-
-        return `Posso ajudar com:<br>
-            • <strong>"resumo"</strong> — visão geral dos custos<br>
-            • <strong>"categorias"</strong> — análise por categoria<br>
-            • <strong>"tendência"</strong> — evolução mensal<br>
-            • <strong>"dicas"</strong> — sugestões de economia<br>
-            • <strong>"carnê"</strong> — análise de contas a receber<br>
-            <br>Faça uma pergunta sobre seus dados financeiros!`;
+        return `🤖 <strong>Não entendi bem sua pergunta, mas posso ajudar com:</strong><br>
+            • "Quem fechou o caixa mês passado?"<br>
+            • "Como foi o resumo de janeiro?"<br>
+            • "Qual minha maior despesa este mês?"<br>
+            • "Como está a tendência dos meus custos?"<br>
+            • "Dê sugestões de economia."`;
     }
 
     // ==========================================
