@@ -973,7 +973,7 @@
         const total = state.costs.reduce((s, c) => s + c.value, 0);
         const now = new Date();
         const monthCosts = state.costs.filter(c => {
-            const d = new Date(c.date);
+            const d = new Date(c.date + 'T12:00:00');
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
         const monthTotal = monthCosts.reduce((s, c) => s + c.value, 0);
@@ -2377,7 +2377,7 @@
         const monthMap = {};
         const catMap = {}; // category per month
         state.costs.forEach(c => {
-            const d = new Date(c.date);
+            const d = new Date(c.date + 'T12:00:00');
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
             if (!monthMap[key]) monthMap[key] = 0;
             monthMap[key] += c.value;
