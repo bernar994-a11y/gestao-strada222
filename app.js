@@ -507,6 +507,7 @@
             previewCount: $('#previewCount'),
             btnExport: $('#btnExport'),
             btnExportCSV: $('#btnExportCSV'),
+            btnExportCaixa: $('#btnExportCaixa'),
             // Toast & Modal
             toast: $('#toast'),
             toastMessage: $('#toastMessage'),
@@ -1237,6 +1238,7 @@
 
         els.btnExport.addEventListener('click', exportExcel);
         els.btnExportCSV.addEventListener('click', exportCSV);
+        if (els.btnExportCaixa) els.btnExportCaixa.addEventListener('click', exportCaixaDetailed);
     }
 
     function getFilteredCosts() {
@@ -1386,6 +1388,59 @@
         a.click();
         URL.revokeObjectURL(url);
         showToast('📄 CSV exportado com sucesso!');
+    }
+    
+    function exportCaixaDetailed() {
+        if (state.currentUnit !== 'bikecafe') {
+            showToast('⚠ Esta função está disponível apenas para o Bike Café');
+            return;
+        }
+        
+        const from = els.exportDateFrom.value;
+        const to = els.exportDateTo.value;
+        
+        let filtered = [...state.caixa];
+        if (from) filtered = filtered.filter(c => c.date >= from);
+        if (to) filtered = filtered.filter(c => c.date <= to);
+        
+        if (filtered.length === 0) {
+            showToast('⚠ Nenhum lançamento de caixa encontrado no período');
+            return;
+        }
+        
+        // Ordenar por data (mais recente primeiro)
+        filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+        
+        const data = filtered.map(c => ({
+            'Data': formatDate(c.date),
+            'Turno': c.turno.charAt(0).toUpperCase() + c.turno.slice(1),
+            'Valor do Caixa (R$)': c.value,
+            'Diferença (R$)': c.diferenca,
+            'Observações': c.obs || ''
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Detalhamento Caixas');
+        
+        // Adicionar Resumo
+        const totalCaixa = filtered.reduce((s, c) => s + c.value, 0);
+        const totalDif = filtered.reduce((s, c) => s + (c.diferenca || 0), 0);
+        
+        const summaryData = [
+            { 'Resumo Financeiro': 'Período', 'Valor': `${from ? formatDate(from) : 'Início'} até ${to ? formatDate(to) : 'Hoje'}` },
+            { 'Resumo Financeiro': 'Total de Fechamentos', 'Valor': filtered.length },
+            { 'Resumo Financeiro': 'Total Acumulado (R$)', 'Valor': totalCaixa },
+            { 'Resumo Financeiro': 'Diferença Acumulada (R$)', 'Valor': totalDif },
+            { 'Resumo Financeiro': 'Saldo Líquido Estimado', 'Valor': totalCaixa + totalDif }
+        ];
+        
+        const ws2 = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, ws2, 'Resumo');
+        
+        const filename = `Resumo_Caixas_${state.currentUnit}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        XLSX.writeFile(wb, filename);
+        showToast(`✅ Relatório exportado: ${filename}`);
     }
 
     // ==========================================
