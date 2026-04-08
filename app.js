@@ -289,27 +289,6 @@
                 }));
             }
 
-            // 5. Carregar Estoque de Bikes
-            const { data: bikesData, error: errBikes } = await supabase
-                .from('estoque_bikes')
-                .select('*')
-                .eq('unit_id', state.currentUnit);
-
-            if (bikesData) {
-                state.bikes = bikesData.map(b => ({
-                    id: b.id,
-                    name: b.name,
-                    brand: b.brand,
-                    model: b.model,
-                    size: b.size,
-                    color: b.color,
-                    qty_deposito: b.qty_deposito || 0,
-                    qty_mostruario: b.qty_mostruario || 0,
-                    unit_id: b.unit_id,
-                    createdAt: b.created_at
-                }));
-            }
-
             saveState();
             renderAll();
             return true;
