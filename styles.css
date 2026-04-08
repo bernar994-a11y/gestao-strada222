@@ -3057,7 +3057,7 @@ input[type="password"]:focus {
 
 /* Filter Bar */
 .inventory-filter-bar {
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     background: rgba(255, 255, 255, 0.02);
     padding: 1.5rem;
     border-radius: var(--radius-lg);
@@ -3067,76 +3067,181 @@ input[type="password"]:focus {
     gap: 1.5rem;
 }
 
-/* Table Container */
-.inventory-table-container {
-    background: rgba(255, 255, 255, 0.01);
-    border-radius: var(--radius-lg);
+/* Resumo Stats */
+.estoque-resumo {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.estoque-stat {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-color);
-    overflow: hidden;
-    overflow-x: auto;
+    border-radius: var(--radius-md);
+    padding: 1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
-/* Table */
-.inventory-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 900px;
-}
-
-.inventory-table th {
-    padding: 1rem;
-    color: var(--text-muted);
-    font-weight: 500;
-    font-size: 0.75rem;
+.estoque-stat-label {
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.estoque-stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+/* Header actions layout */
+.estoque-header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+/* Panel title layout */
+.panel-title-container {
+    flex: 1;
+}
+
+#panelEstoque > .panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: none;
+}
+
+/* Bike Card List */
+.bike-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Individual Bike Card */
+.bike-card {
     background: rgba(255, 255, 255, 0.02);
-    text-align: left;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: all var(--transition-fast);
 }
 
-.inventory-table td {
-    padding: 1rem;
-    border-top: 1px solid var(--border-color);
-    vertical-align: middle;
+.bike-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
-.inventory-table tr:hover {
-    background: rgba(255, 255, 255, 0.02);
+.bike-card--out {
+    opacity: 0.6;
 }
 
-/* Column helpers */
-.col-deposito {
-    background: rgba(108, 92, 231, 0.03);
-    text-align: center;
-    font-weight: 600;
+.bike-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    gap: 1.5rem;
 }
 
-.col-mostruario {
-    background: rgba(0, 206, 255, 0.03);
-    text-align: center;
-    font-weight: 600;
+.bike-card-info {
+    flex: 1;
+    min-width: 0;
 }
 
-.col-total {
-    text-align: center;
+.bike-card-name {
     font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.col-centered {
-    text-align: center;
+.bike-card-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
 }
 
-.col-right {
-    text-align: right;
+.bike-card-specs {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.bike-spec-tag {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Quantity Boxes */
+.bike-card-qtys {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.bike-qty-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-sm);
+    min-width: 60px;
+}
+
+.bike-qty-dep {
+    background: rgba(108, 92, 231, 0.08);
+}
+
+.bike-qty-mos {
+    background: rgba(0, 206, 255, 0.08);
+}
+
+.bike-qty-total {
+    background: rgba(245, 166, 35, 0.08);
+}
+
+.bike-qty-num {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.bike-qty-dep .bike-qty-num { color: var(--accent-3); }
+.bike-qty-mos .bike-qty-num { color: var(--accent-4); }
+.bike-qty-total .bike-qty-num { color: var(--accent-1); }
+
+.bike-qty-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    font-weight: 600;
 }
 
 /* Status Badges */
 .status-pill {
     display: inline-flex;
     align-items: center;
-    padding: 0.25rem 0.75rem;
+    padding: 0.2rem 0.6rem;
     border-radius: 100px;
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -3154,45 +3259,57 @@ input[type="password"]:focus {
     border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-/* Bike metadata */
-.bike-id-meta {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-}
-
-.bike-brand-tag {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-/* Panel title layout */
-.panel-title-container {
-    flex: 1;
-}
-
-#panelEstoque > .panel-header {
+/* Action Bar */
+.bike-card-actions {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    max-width: none;
+    gap: 0.5rem;
+    padding: 0.6rem 1.25rem;
+    background: rgba(255, 255, 255, 0.01);
+    border-top: 1px solid var(--border-color);
 }
 
-/* Action Buttons */
-.btn-action {
-    transition: all 0.2s ease;
+.bike-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    transition: all var(--transition-fast);
+    font-family: var(--font-family);
 }
 
-.btn-action:hover {
-    transform: translateY(-2px);
-    filter: brightness(1.2);
+.bike-action-move {
+    background: rgba(108, 92, 231, 0.12);
+    color: var(--accent-3);
 }
 
-.btn-action:active {
-    transform: translateY(0);
+.bike-action-move:hover {
+    background: rgba(108, 92, 231, 0.25);
+}
+
+.bike-action-return {
+    background: rgba(0, 206, 255, 0.1);
+    color: var(--accent-4);
+}
+
+.bike-action-return:hover {
+    background: rgba(0, 206, 255, 0.2);
+}
+
+.bike-action-delete {
+    background: rgba(239, 68, 68, 0.08);
+    color: #EF4444;
+    margin-left: auto;
+}
+
+.bike-action-delete:hover {
+    background: rgba(239, 68, 68, 0.2);
 }
 
 /* Responsividade Estoque */
@@ -3201,8 +3318,36 @@ input[type="password"]:focus {
         grid-template-columns: 1fr;
     }
 
-    .inventory-table th,
-    .inventory-table td {
-        padding: 0.75rem 0.5rem;
+    .estoque-resumo {
+        flex-direction: column;
+    }
+
+    .estoque-stat {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .estoque-header-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    #panelEstoque > .panel-header {
+        flex-direction: column;
+    }
+
+    .bike-card-top {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .bike-card-qtys {
+        justify-content: center;
+    }
+
+    .bike-card-actions {
+        flex-wrap: wrap;
     }
 }

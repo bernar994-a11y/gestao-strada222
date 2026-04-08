@@ -1460,12 +1460,22 @@
         } catch (e) { }
     }
 
+    // Helper functions for modals
+    function _openModal(id) {
+        const m = document.getElementById(id);
+        if (m) m.classList.add('show');
+    }
+    function _closeModal(id) {
+        const m = document.getElementById(id);
+        if (m) m.classList.remove('show');
+    }
+
     function renderBikes() {
         if (state.currentUnit !== 'bikeshop') return;
         const search = ($('#estoqueSearch') ? $('#estoqueSearch').value.toLowerCase() : '');
         const filterMarca = ($('#estoqueFilterMarca') ? $('#estoqueFilterMarca').value : '');
-        const tbody = $('#estoqueTableBody');
-        if (!tbody) return;
+        const container = $('#estoqueCardList');
+        if (!container) return;
 
         let filtered = state.bikes.filter(b => {
             const matchSearch = b.name.toLowerCase().includes(search) || 
@@ -1484,63 +1494,97 @@
             filterMarcaEl.value = filterMarca;
         }
 
+        // Resumo
+        const totalDep = state.bikes.reduce((s, b) => s + (b.qty_deposito || 0), 0);
+        const totalMos = state.bikes.reduce((s, b) => s + (b.qty_mostruario || 0), 0);
+        const resumoEl = $('#estoqueResumo');
+        if (resumoEl) {
+            resumoEl.innerHTML = `
+                <div class="estoque-stat">
+                    <span class="estoque-stat-label">Depósito</span>
+                    <span class="estoque-stat-value" style="color:var(--accent-3);">${totalDep}</span>
+                </div>
+                <div class="estoque-stat">
+                    <span class="estoque-stat-label">Mostruário</span>
+                    <span class="estoque-stat-value" style="color:var(--accent-4);">${totalMos}</span>
+                </div>
+                <div class="estoque-stat">
+                    <span class="estoque-stat-label">Total Geral</span>
+                    <span class="estoque-stat-value" style="color:var(--accent-1);">${totalDep + totalMos}</span>
+                </div>
+            `;
+        }
+
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:4rem; color:var(--text-muted); background:rgba(255,255,255,0.01);">
-                <div style="font-size:2rem; margin-bottom:1rem; opacity:0.3;">🚲</div>
+            container.innerHTML = `<div style="text-align:center; padding:4rem; color:var(--text-muted);">
+                <div style="font-size:2.5rem; margin-bottom:1rem; opacity:0.3;">🚲</div>
                 Nenhuma bike encontrada no estoque
-            </td></tr>`;
+            </div>`;
             return;
         }
 
-        tbody.innerHTML = filtered.map(b => {
+        container.innerHTML = filtered.map(b => {
             const total = (b.qty_deposito || 0) + (b.qty_mostruario || 0);
             const isOut = total === 0;
             
-            return `<tr style="${isOut ? 'opacity:0.6;' : ''}">
-                <td>
-                    <div style="font-weight:600; color:${isOut ? 'var(--text-muted)' : 'var(--text-primary)'};">${esc(b.name)}</div>
-                    <div class="bike-id-meta">${esc(b.model || 'Modelo não informado')}</div>
-                </td>
-                <td><span class="bike-brand-tag">${esc(b.brand || '-')}</span></td>
-                <td class="col-centered">
-                    <span style="font-size:0.8rem; background:rgba(255,255,255,0.05); padding:0.2rem 0.5rem; border-radius:4px;">${esc(b.size || '-')}</span>
-                    <span style="font-size:0.8rem; color:var(--text-muted); margin-left:4px;">${esc(b.color || '')}</span>
-                </td>
-                <td class="col-deposito">${b.qty_deposito}</td>
-                <td class="col-mostruario">${b.qty_mostruario}</td>
-                <td class="col-total" style="color:${total > 0 ? 'var(--accent-4)' : 'var(--accent-2)'}">${total}</td>
-                <td class="col-centered">
-                    <span class="status-pill ${isOut ? 'status-outstock' : 'status-instock'}">
-                        ${isOut ? 'Esgotado' : 'Em Estoque'}
-                    </span>
-                </td>
-                <td class="col-right">
-                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
-                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toShowroom')" title="Mover para Mostruário" style="background:rgba(108, 92, 231, 0.2); color:var(--accent-3); padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                        </button>
-                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toWarehouse')" title="Retornar ao Depósito" style="background:rgba(0, 206, 255, 0.1); color:var(--accent-4); padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-                        </button>
-                        <button class="btn-action" onclick="GestaoStrada.deleteBike('${b.id}')" title="Excluir" style="background:rgba(239, 68, 68, 0.1); color:#EF4444; padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        </button>
+            return `<div class="bike-card ${isOut ? 'bike-card--out' : ''}">
+                <div class="bike-card-top">
+                    <div class="bike-card-info">
+                        <div class="bike-card-name">${esc(b.name)}</div>
+                        <div class="bike-card-meta">${esc(b.brand || '')} ${b.model ? '· ' + esc(b.model) : ''}</div>
+                        <div class="bike-card-specs">
+                            <span class="bike-spec-tag">${esc(b.size || '-')}</span>
+                            <span class="bike-spec-tag">${esc(b.color || '-')}</span>
+                            <span class="status-pill ${isOut ? 'status-outstock' : 'status-instock'}">${isOut ? 'Esgotado' : 'Em Estoque'}</span>
+                        </div>
                     </div>
-                </td>
-            </tr>`;
+                    <div class="bike-card-qtys">
+                        <div class="bike-qty-box bike-qty-dep">
+                            <span class="bike-qty-num">${b.qty_deposito}</span>
+                            <span class="bike-qty-label">Depósito</span>
+                        </div>
+                        <div class="bike-qty-box bike-qty-mos">
+                            <span class="bike-qty-num">${b.qty_mostruario}</span>
+                            <span class="bike-qty-label">Mostruário</span>
+                        </div>
+                        <div class="bike-qty-box bike-qty-total">
+                            <span class="bike-qty-num">${total}</span>
+                            <span class="bike-qty-label">Total</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bike-card-actions">
+                    <button class="bike-action-btn bike-action-move" onclick="GestaoStrada.openMoveStock('${b.id}', 'toShowroom')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        Mostruário
+                    </button>
+                    <button class="bike-action-btn bike-action-return" onclick="GestaoStrada.openMoveStock('${b.id}', 'toWarehouse')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                        Depósito
+                    </button>
+                    <button class="bike-action-btn bike-action-delete" onclick="GestaoStrada.deleteBike('${b.id}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            </div>`;
         }).join('');
     }
 
     async function saveBike() {
+        const nameEl = $('#bikeName');
+        if (!nameEl || !nameEl.value.trim()) {
+            showToast('⚠ Preencha o nome da bike');
+            return;
+        }
         const id = 'bike_' + Date.now();
         const bike = {
             id: id,
-            name: $('#bikeName').value,
-            brand: $('#bikeBrand').value,
-            model: $('#bikeModel').value,
-            size: $('#bikeSize').value,
-            color: $('#bikeColor').value,
-            qty_deposito: parseInt($('#bikeQty').value) || 0,
+            name: $('#bikeName').value.trim(),
+            brand: ($('#bikeBrand').value || '').trim(),
+            model: ($('#bikeModel').value || '').trim(),
+            size: ($('#bikeSize').value || '').trim(),
+            color: ($('#bikeColor').value || '').trim(),
+            qty_deposito: parseInt($('#bikeQty').value) || 1,
             qty_mostruario: 0,
             unit_id: state.currentUnit
         };
@@ -1548,8 +1592,9 @@
         state.bikes.push(bike);
         saveState();
         renderBikes();
-        closeModal('modalAddBike');
-        $('#formAddBike').reset();
+        _closeModal('modalAddBike');
+        const form = $('#formAddBike');
+        if (form) form.reset();
         showToast('✅ Bike cadastrada com sucesso!');
         await saveBikeToSupabase(bike);
     }
@@ -1582,7 +1627,7 @@
             }
         }
 
-        openModal('modalMoveStock');
+        _openModal('modalMoveStock');
     }
 
     async function confirmMoveStock() {
@@ -1611,7 +1656,7 @@
 
         saveState();
         renderBikes();
-        closeModal('modalMoveStock');
+        _closeModal('modalMoveStock');
         showToast('✅ Movimentação realizada com sucesso!');
         await saveBikeToSupabase(bike);
     }
@@ -1625,6 +1670,63 @@
         await deleteBikeSupabase(id);
     }
     
+    function printEstoqueDemonstrativo() {
+        const bikes = state.bikes.filter(b => b.unit_id === state.currentUnit);
+        const deposito = bikes.filter(b => (b.qty_deposito || 0) > 0);
+        const mostruario = bikes.filter(b => (b.qty_mostruario || 0) > 0);
+        const today = new Date().toLocaleDateString('pt-BR');
+        
+        const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Demonstrativo de Estoque</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 2rem; color: #1a1a2e; }
+  .header { text-align:center; margin-bottom:2rem; border-bottom: 2px solid #F5A623; padding-bottom: 1rem; }
+  .header h1 { font-size:1.5rem; color: #F5A623; margin-bottom: 0.25rem; }
+  .header p { font-size:0.85rem; color:#666; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .col-title { font-size:1rem; font-weight:700; padding:0.75rem; border-radius:8px; margin-bottom:1rem; text-align:center; }
+  .col-dep .col-title { background:#f0ebff; color:#6C5CE7; }
+  .col-mos .col-title { background:#e6faff; color:#00CEFF; }
+  table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+  th { background:#f5f5f5; padding:0.5rem; text-align:left; border-bottom:2px solid #ddd; font-size:0.7rem; text-transform:uppercase; color:#888; }
+  td { padding:0.5rem; border-bottom:1px solid #eee; }
+  .qty { text-align:center; font-weight:700; font-size:0.9rem; }
+  .empty { text-align:center; padding:2rem; color:#999; font-style:italic; }
+  .footer { margin-top:2rem; text-align:center; font-size:0.75rem; color:#999; border-top:1px solid #eee; padding-top:1rem; }
+  .total-row { font-weight:700; background:#f9f9f9; }
+  @media print { body { padding: 1rem; } }
+</style></head><body>
+<div class="header">
+  <h1>🚲 STRADA BIKESHOP</h1>
+  <h2 style="font-size:1.1rem; margin-top:0.5rem;">Demonstrativo de Estoque</h2>
+  <p>Emitido em: ${today}</p>
+</div>
+<div class="grid">
+  <div class="col-dep">
+    <div class="col-title">📦 ESTOQUE DEPÓSITO</div>
+    ${deposito.length > 0 ? '<table><thead><tr><th>Bike</th><th>Marca</th><th>Tam</th><th class="qty">Qtd</th></tr></thead><tbody>' + 
+      deposito.map(b => '<tr><td><strong>' + esc(b.name) + '</strong><br><small style="color:#888">' + esc(b.model||'') + '</small></td><td>' + esc(b.brand||'-') + '</td><td>' + esc(b.size||'-') + '</td><td class="qty">' + b.qty_deposito + '</td></tr>').join('') +
+      '<tr class="total-row"><td colspan="3">TOTAL</td><td class="qty">' + deposito.reduce((s,b) => s + b.qty_deposito, 0) + '</td></tr></tbody></table>' 
+      : '<div class="empty">Nenhuma bike no depósito</div>'}
+  </div>
+  <div class="col-mos">
+    <div class="col-title">🏪 ESTOQUE MOSTRUÁRIO</div>
+    ${mostruario.length > 0 ? '<table><thead><tr><th>Bike</th><th>Marca</th><th>Tam</th><th class="qty">Qtd</th></tr></thead><tbody>' + 
+      mostruario.map(b => '<tr><td><strong>' + esc(b.name) + '</strong><br><small style="color:#888">' + esc(b.model||'') + '</small></td><td>' + esc(b.brand||'-') + '</td><td>' + esc(b.size||'-') + '</td><td class="qty">' + b.qty_mostruario + '</td></tr>').join('') +
+      '<tr class="total-row"><td colspan="3">TOTAL</td><td class="qty">' + mostruario.reduce((s,b) => s + b.qty_mostruario, 0) + '</td></tr></tbody></table>' 
+      : '<div class="empty">Nenhuma bike no mostruário</div>'}
+  </div>
+</div>
+<div class="footer">STRADA BIKESHOP - Sistema de Gestão</div>
+<script>window.onload = function() { window.print(); }</script>
+</body></html>`;
+        
+        const w = window.open('', '_blank');
+        w.document.write(html);
+        w.document.close();
+    }
+
     function exportCaixaDetailed() {
         if (state.currentUnit !== 'bikecafe') {
             showToast('⚠ Esta função está disponível apenas para o Bike Café');
@@ -3159,15 +3261,10 @@
         deleteCaixa,
         // Estoque
         renderBikes, saveBike, openMoveStock, confirmMoveStock, deleteBike,
+        printEstoqueDemonstrativo,
         // Modais genéricos
-        openModal: function(id) { 
-            const m = document.getElementById(id); 
-            if (m) m.classList.add('show'); 
-        },
-        closeModal: function(id) { 
-            const m = document.getElementById(id); 
-            if (m) m.classList.remove('show'); 
-        },
+        openModal: _openModal,
+        closeModal: _closeModal,
         toggleAllMktContacts, updateMktCount: updateMktSelectedCount,
         askAI,
         reuseCampaign: function(id) {
