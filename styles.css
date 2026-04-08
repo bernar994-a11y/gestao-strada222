@@ -2966,3 +2966,64 @@ input[type="password"]:focus {
         padding: 0.625rem 0.75rem;
     }
 }
+
+/* ==========================================
+   Estoque de Bikes (Strada BikeShop)
+   ========================================== */
+
+#panelEstoque .preview-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+#panelEstoque .preview-table tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.badge-qty {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-deposito {
+    background: rgba(108, 92, 231, 0.2);
+    color: var(--accent-3);
+}
+
+.badge-mostruario {
+    background: rgba(0, 206, 255, 0.2);
+    color: var(--accent-4);
+}
+
+.btn-action {
+    transition: all 0.2s ease;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.2);
+}
+
+.btn-action:active {
+    transform: translateY(0);
+}
+
+/* Responsividade Estoque */
+@media (max-width: 768px) {
+    #panelEstoque .filter-bar div {
+        grid-template-columns: 1fr !important;
+    }
+    
+    #panelEstoque .preview-table th, 
+    #panelEstoque .preview-table td {
+        padding: 0.75rem 0.5rem !important;
+    }
+}

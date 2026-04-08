@@ -229,6 +229,15 @@
                     </svg>
                     <span>Gestão de Carnê</span>
                 </button>
+                <button class="sidebar-nav-item" data-panel="12" id="navEstoque" style="display:none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18.5" cy="17.5" r="3.5" />
+                        <circle cx="5.5" cy="17.5" r="3.5" />
+                        <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2" />
+                    </svg>
+                    <span>Estoque de Bikes</span>
+                </button>
                 <button class="sidebar-nav-item" data-panel="11" id="navCaixa" style="display:none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -1068,8 +1077,220 @@
                     </div>
                 </section>
 
+                <!-- Panel 12: Estoque de Bikes (BikeShop Only) -->
+                <section class="panel" id="panelEstoque" data-panel="12">
+                    <div class="panel-header">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">
+                            <div>
+                                <h2>Estoque de Bikes</h2>
+                                <p class="panel-subtitle">Gerencie o mostruário e o depósito</p>
+                            </div>
+                            <button class="btn-primary" onclick="GestaoStrada.openModal('modalAddBike')">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                <span>Adicionar Bike</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="panel-content">
+                        <!-- Busca e Filtros -->
+                        <div class="filter-bar" style="margin-bottom: 2rem; background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+                                <div class="form-group" style="margin:0">
+                                    <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Busca Rápida</label>
+                                    <div class="auth-field" style="margin:0">
+                                        <div class="auth-input-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+                                        <input type="text" id="estoqueSearch" placeholder="Nome, marca ou modelo..." oninput="GestaoStrada.renderBikes()">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin:0">
+                                    <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Marca</label>
+                                    <select id="estoqueFilterMarca" onchange="GestaoStrada.renderBikes()" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1rem;"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabela de Estoque -->
+                        <div class="section-block">
+                            <div class="table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.01); border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                                <table class="preview-table" style="width:100%; border-collapse: collapse; min-width: 900px;">
+                                    <thead>
+                                        <tr style="text-align: left; background: rgba(255,255,255,0.02);">
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem;">Nome / Modelo</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem;">Marca</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center;">Tam / Cor</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center; background: rgba(108, 92, 231, 0.05);">Depósito</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center; background: rgba(0, 206, 255, 0.05);">Mostruário</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center;">Total</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: right;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="estoqueTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                <!-- Panel 12: Estoque de Bikes (BikeShop Only) -->
+                <section class="panel" id="panelEstoque" data-panel="12">
+                    <div class="panel-header">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">
+                            <div>
+                                <h2>Estoque de Bikes</h2>
+                                <p class="panel-subtitle">Gerencie o mostruário e o depósito</p>
+                            </div>
+                            <button class="btn-primary" onclick="GestaoStrada.openModal('modalAddBike')">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="5" x2="12" y2="19" />
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                </svg>
+                                <span>Adicionar Bike</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="panel-content">
+                        <!-- Busca e Filtros -->
+                        <div class="filter-bar" style="margin-bottom: 2rem; background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                            <div style="display:grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+                                <div class="form-group" style="margin:0">
+                                    <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Busca Rápida</label>
+                                    <div class="auth-field" style="margin:0">
+                                        <div class="auth-input-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+                                        <input type="text" id="estoqueSearch" placeholder="Nome, marca ou modelo..." oninput="GestaoStrada.renderBikes()">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin:0">
+                                    <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Marca</label>
+                                    <select id="estoqueFilterMarca" onchange="GestaoStrada.renderBikes()" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1rem;"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tabela de Estoque -->
+                        <div class="section-block">
+                            <div class="table-wrapper" style="overflow-x: auto; background: rgba(255,255,255,0.01); border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                                <table class="preview-table" style="width:100%; border-collapse: collapse; min-width: 900px;">
+                                    <thead>
+                                        <tr style="text-align: left; background: rgba(255,255,255,0.02);">
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem;">Nome / Modelo</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem;">Marca</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center;">Tam / Cor</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center; background: rgba(108, 92, 231, 0.05);">Depósito</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center; background: rgba(0, 206, 255, 0.05);">Mostruário</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: center;">Total</th>
+                                            <th style="padding: 1rem; color: var(--text-muted); font-weight: 500; font-size: 0.85rem; text-align: right;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="estoqueTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
+    </div>
+
+    <!-- Modais Estoque -->
+    <div class="modal" id="modalAddBike">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Cadastrar Nova Bike</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalAddBike')">&times;</button>
+            </div>
+            <form id="formAddBike" class="cost-form" onsubmit="event.preventDefault(); GestaoStrada.saveBike()">
+                <div class="form-group">
+                    <label>Nome da Bike</label>
+                    <input type="text" id="bikeName" placeholder="Ex: Specialized Chisel Comp" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Marca</label><input type="text" id="bikeBrand" placeholder="Ex: Specialized" required></div>
+                    <div class="form-group"><label>Modelo</label><input type="text" id="bikeModel" placeholder="Ex: MTB 2024" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tamanho</label><input type="text" id="bikeSize" placeholder="Ex: M / 17" required></div>
+                    <div class="form-group"><label>Cor</label><input type="text" id="bikeColor" placeholder="Ex: Vermelho Metálico" required></div>
+                </div>
+                <div class="form-group">
+                    <label>Quantidade Inicial (Depósito)</label>
+                    <input type="number" id="bikeQty" value="1" min="1" required>
+                </div>
+                <button type="submit" class="btn-primary" style="width:100%; margin-top: 1rem;">Salvar no Estoque</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="modalMoveStock">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 id="moveStockTitle">Mover para Mostruário</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalMoveStock')">&times;</button>
+            </div>
+            <div class="panel-subtitle" id="moveStockSubtitle" style="margin-bottom: 1.5rem; padding: 0 1.5rem; color: var(--text-muted);"></div>
+            <form id="formMoveStock" class="cost-form" onsubmit="event.preventDefault(); GestaoStrada.confirmMoveStock()">
+                <input type="hidden" id="moveBikeId">
+                <input type="hidden" id="moveDirection">
+                <div class="form-group">
+                    <label id="moveAmountLabel">Quantidade a mover</label>
+                    <input type="number" id="moveQuantity" value="1" min="1" required>
+                    <small style="color:var(--text-muted); margin-top: 0.5rem; display:block;" id="moveMaxInfo">Máximo disponível: 0</small>
+                </div>
+                <button type="submit" class="btn-primary" style="width:100%; margin-top: 1rem;" id="btnConfirmMove">Confirmar Movimentação</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modais Estoque -->
+    <div class="modal" id="modalAddBike">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Cadastrar Nova Bike</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalAddBike')">&times;</button>
+            </div>
+            <form id="formAddBike" class="cost-form" onsubmit="event.preventDefault(); GestaoStrada.saveBike()">
+                <div class="form-group">
+                    <label>Nome da Bike</label>
+                    <input type="text" id="bikeName" placeholder="Ex: Specialized Chisel Comp" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Marca</label><input type="text" id="bikeBrand" placeholder="Ex: Specialized" required></div>
+                    <div class="form-group"><label>Modelo</label><input type="text" id="bikeModel" placeholder="Ex: MTB 2024" required></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Tamanho</label><input type="text" id="bikeSize" placeholder="Ex: M / 17" required></div>
+                    <div class="form-group"><label>Cor</label><input type="text" id="bikeColor" placeholder="Ex: Vermelho Metálico" required></div>
+                </div>
+                <div class="form-group">
+                    <label>Quantidade Inicial (Depósito)</label>
+                    <input type="number" id="bikeQty" value="1" min="1" required>
+                </div>
+                <button type="submit" class="btn-primary" style="width:100%; margin-top: 1rem;">Salvar no Estoque</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="modalMoveStock">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 id="moveStockTitle">Mover para Mostruário</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalMoveStock')">&times;</button>
+            </div>
+            <div class="panel-subtitle" id="moveStockSubtitle" style="margin-bottom: 1.5rem; padding: 0 1.5rem; color: var(--text-muted);"></div>
+            <form id="formMoveStock" class="cost-form" onsubmit="event.preventDefault(); GestaoStrada.confirmMoveStock()">
+                <input type="hidden" id="moveBikeId">
+                <input type="hidden" id="moveDirection">
+                <div class="form-group">
+                    <label id="moveAmountLabel">Quantidade a mover</label>
+                    <input type="number" id="moveQuantity" value="1" min="1" required>
+                    <small style="color:var(--text-muted); margin-top: 0.5rem; display:block;" id="moveMaxInfo">Máximo disponível: 0</small>
+                </div>
+                <button type="submit" class="btn-primary" style="width:100%; margin-top: 1rem;" id="btnConfirmMove">Confirmar Movimentação</button>
+            </form>
+        </div>
     </div>
 
     <!-- Toast -->

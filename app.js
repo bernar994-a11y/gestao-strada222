@@ -268,6 +268,48 @@
                 state.caixa = [];
             }
 
+            // 5. Carregar Estoque de Bikes
+            const { data: bikesData, error: errBikes } = await supabase
+                .from('estoque_bikes')
+                .select('*')
+                .eq('unit_id', state.currentUnit);
+
+            if (bikesData) {
+                state.bikes = bikesData.map(b => ({
+                    id: b.id,
+                    name: b.name,
+                    brand: b.brand,
+                    model: b.model,
+                    size: b.size,
+                    color: b.color,
+                    qty_deposito: b.qty_deposito || 0,
+                    qty_mostruario: b.qty_mostruario || 0,
+                    unit_id: b.unit_id,
+                    createdAt: b.created_at
+                }));
+            }
+
+            // 5. Carregar Estoque de Bikes
+            const { data: bikesData, error: errBikes } = await supabase
+                .from('estoque_bikes')
+                .select('*')
+                .eq('unit_id', state.currentUnit);
+
+            if (bikesData) {
+                state.bikes = bikesData.map(b => ({
+                    id: b.id,
+                    name: b.name,
+                    brand: b.brand,
+                    model: b.model,
+                    size: b.size,
+                    color: b.color,
+                    qty_deposito: b.qty_deposito || 0,
+                    qty_mostruario: b.qty_mostruario || 0,
+                    unit_id: b.unit_id,
+                    createdAt: b.created_at
+                }));
+            }
+
             saveState();
             renderAll();
             return true;
@@ -381,6 +423,7 @@
         EMPLOYEES: 'gestao_strada_employees',
         CARNES_PREFIX: 'gestao_strada_carnes_',
         CAIXA_PREFIX: 'gestao_strada_caixa_',
+        ESTOQUE_PREFIX: 'gestao_strada_estoque_',
     };
 
     function getStoredEmployees() {
@@ -402,6 +445,7 @@
         recipes: [],
         carnes: [],
         caixa: [],
+        bikes: [],
         currentPanel: 0,
     };
 
@@ -418,6 +462,7 @@
             const ingredients = localStorage.getItem(STORAGE_KEYS.INGREDIENTS);
             const recipes = localStorage.getItem(STORAGE_KEYS.RECIPES);
             const carnes = localStorage.getItem(storageKey(STORAGE_KEYS.CARNES_PREFIX));
+            const bikes = localStorage.getItem(storageKey(STORAGE_KEYS.ESTOQUE_PREFIX));
             state.costs = costs ? JSON.parse(costs) : [];
             state.categories = cats ? JSON.parse(cats) : [...BUSINESS_CONFIG[state.currentUnit].defaultCategories];
             state.contacts = contacts ? JSON.parse(contacts) : [];
@@ -425,6 +470,7 @@
             state.ingredients = ingredients ? JSON.parse(ingredients) : [];
             state.recipes = recipes ? JSON.parse(recipes) : [];
             state.carnes = carnes ? JSON.parse(carnes) : [];
+            state.bikes = bikes ? JSON.parse(bikes) : [];
         } catch (e) {
             state.costs = [];
             state.categories = [...BUSINESS_CONFIG[state.currentUnit].defaultCategories];
@@ -444,6 +490,7 @@
         localStorage.setItem(STORAGE_KEYS.INGREDIENTS, JSON.stringify(state.ingredients));
         localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(state.recipes));
         localStorage.setItem(storageKey(STORAGE_KEYS.CARNES_PREFIX), JSON.stringify(state.carnes));
+        localStorage.setItem(storageKey(STORAGE_KEYS.ESTOQUE_PREFIX), JSON.stringify(state.bikes));
     }
 
     // ==========================================
@@ -583,6 +630,16 @@
         await loadFromSupabase();
         if (typeof loadEmployeesFromSupabase === 'function') await loadEmployeesFromSupabase();
         els.unitScreen.style.display = 'none';
+        
+        // Show/Hide unit specific navigation
+        if (unit === 'bikeshop') {
+            if ($('#navEstoque')) $('#navEstoque').style.display = '';
+            if ($('#navCaixa')) $('#navCaixa').style.display = 'none';
+        } else {
+            if ($('#navEstoque')) $('#navEstoque').style.display = 'none';
+            if ($('#navCaixa')) $('#navCaixa').style.display = '';
+        }
+
         showApp();
     }
 
@@ -953,21 +1010,23 @@
     // ==========================================
     let toastTimeout = null;
     function showToast(message) {
+        if (!els.toast) return;
         els.toastMessage.textContent = message;
         els.toast.classList.add('show');
         clearTimeout(toastTimeout);
-        toastTimeout = setTimeout(() => els.toast.classList.remove('show'), 2500);
+        toastTimeout = setTimeout(() => els.toast.classList.remove('show'), 3000);
     }
 
     // ==========================================
     // Rendering
     // ==========================================
     function renderAll() {
-        renderDashboard();
-        renderCategorySelects();
-        renderAllEntries();
-        renderCategories();
-        updateExportPreview();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        if (typeof renderCategorySelects === 'function') renderCategorySelects();
+        if (typeof renderAllEntries === 'function') renderAllEntries();
+        if (typeof renderCategories === 'function') renderCategories();
+        if (typeof updateExportPreview === 'function') updateExportPreview();
+        if (typeof renderBikes === 'function') renderBikes();
     }
 
     function renderDashboard() {
@@ -1388,6 +1447,196 @@
         a.click();
         URL.revokeObjectURL(url);
         showToast('📄 CSV exportado com sucesso!');
+    }
+
+    // ==========================================
+    // Estoque de Bikes (Strada BikeShop)
+    // ==========================================
+    async function saveBikeToSupabase(bike) {
+        if (!supabase || !state.currentUnit) return;
+        try {
+            const { error } = await supabase
+                .from('estoque_bikes')
+                .upsert({
+                    id: bike.id,
+                    name: bike.name,
+                    brand: bike.brand,
+                    model: bike.model,
+                    size: bike.size,
+                    color: bike.color,
+                    qty_deposito: bike.qty_deposito,
+                    qty_mostruario: bike.qty_mostruario,
+                    unit_id: state.currentUnit
+                }, { onConflict: 'id' });
+            if (error) console.warn('Supabase bike save error:', error.message);
+        } catch (e) {
+            console.warn('Supabase bike sync error:', e);
+        }
+    }
+
+    async function deleteBikeSupabase(id) {
+        if (!supabase) return;
+        try {
+            await supabase.from('estoque_bikes').delete().eq('id', id);
+        } catch (e) { }
+    }
+
+    function renderBikes() {
+        if (state.currentUnit !== 'bikeshop') return;
+        const search = ($('#estoqueSearch') ? $('#estoqueSearch').value.toLowerCase() : '');
+        const filterMarca = ($('#estoqueFilterMarca') ? $('#estoqueFilterMarca').value : '');
+        const tbody = $('#estoqueTableBody');
+        if (!tbody) return;
+
+        let filtered = state.bikes.filter(b => {
+            const matchSearch = b.name.toLowerCase().includes(search) || 
+                                (b.brand && b.brand.toLowerCase().includes(search)) || 
+                                (b.model && b.model.toLowerCase().includes(search));
+            const matchMarca = filterMarca === '' || b.brand === filterMarca;
+            return matchSearch && matchMarca;
+        });
+
+        // Atualizar Filtro de Marcas
+        const marcas = [...new Set(state.bikes.map(b => b.brand))].filter(Boolean).sort();
+        const filterMarcaEl = $('#estoqueFilterMarca');
+        if (filterMarcaEl && filterMarcaEl.options.length <= 1) {
+            filterMarcaEl.innerHTML = '<option value="">Todas as Marcas</option>' + 
+                marcas.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+            filterMarcaEl.value = filterMarca;
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">Nenhuma bike encontrada no estoque</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(b => {
+            const total = (b.qty_deposito || 0) + (b.qty_mostruario || 0);
+            const isLow = total === 0;
+            return `<tr style="border-top: 1px solid rgba(255,255,255,0.05); ${isLow ? 'opacity:0.6;' : ''}">
+                <td style="padding: 1.25rem 1rem;">
+                    <div style="font-weight:600; color:${isLow ? 'var(--text-muted)' : 'white'};">${esc(b.name)}</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted);">${esc(b.model || '')}</div>
+                </td>
+                <td style="padding: 1rem;">${esc(b.brand || '-')}</td>
+                <td style="padding: 1rem; text-align:center;">
+                    <span style="font-size:0.8rem; background:rgba(255,255,255,0.05); padding:0.2rem 0.6rem; border-radius:6px; margin-right:4px;">${esc(b.size || '-')}</span>
+                    <span style="font-size:0.8rem; color:var(--text-muted);">${esc(b.color || '')}</span>
+                </td>
+                <td style="padding: 1rem; text-align:center; font-weight:600; background:rgba(108, 92, 231, 0.05);">${b.qty_deposito}</td>
+                <td style="padding: 1rem; text-align:center; font-weight:600; background:rgba(0, 206, 255, 0.05);">${b.qty_mostruario}</td>
+                <td style="padding: 1rem; text-align:center;">
+                    <div style="font-weight:700; color:${total > 0 ? 'var(--primary-light)' : '#ff4757'};">${total}</div>
+                </td>
+                <td style="padding: 1rem; text-align:right;">
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toShowroom')" title="Mover para Mostruário" style="background:rgba(108, 92, 231, 0.2); color:var(--primary-light); padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        </button>
+                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toWarehouse')" title="Retornar ao Depósito" style="background:rgba(0, 206, 255, 0.1); color:#00CEFF; padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                        </button>
+                        <button class="btn-action" onclick="GestaoStrada.deleteBike('${b.id}')" title="Excluir" style="background:rgba(255, 71, 87, 0.1); color:#ff4757; padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function saveBike() {
+        const id = 'bike_' + Date.now();
+        const bike = {
+            id: id,
+            name: $('#bikeName').value,
+            brand: $('#bikeBrand').value,
+            model: $('#bikeModel').value,
+            size: $('#bikeSize').value,
+            color: $('#bikeColor').value,
+            qty_deposito: parseInt($('#bikeQty').value) || 0,
+            qty_mostruario: 0,
+            unit_id: state.currentUnit
+        };
+        
+        state.bikes.push(bike);
+        saveState();
+        renderBikes();
+        closeModal('modalAddBike');
+        $('#formAddBike').reset();
+        showToast('✅ Bike cadastrada com sucesso!');
+        await saveBikeToSupabase(bike);
+    }
+
+    function openMoveStock(id, direction) {
+        const bike = state.bikes.find(b => b.id === id);
+        if (!bike) return;
+
+        $('#moveBikeId').value = id;
+        $('#moveDirection').value = direction;
+        $('#moveQuantity').value = 1;
+
+        if (direction === 'toShowroom') {
+            $('#moveStockTitle').textContent = 'Mover para Mostruário';
+            $('#moveStockSubtitle').textContent = `Transferir unidades de "${bike.name}" para o mostruário da loja.`;
+            $('#moveMaxInfo').textContent = `Disponível no Depósito: ${bike.qty_deposito}`;
+            $('#moveQuantity').max = bike.qty_deposito;
+            if (bike.qty_deposito <= 0) {
+                showToast('⚠ Não há estoque no depósito para mover');
+                return;
+            }
+        } else {
+            $('#moveStockTitle').textContent = 'Retornar ao Depósito';
+            $('#moveStockSubtitle').textContent = `Retornar unidades de "${bike.name}" do mostruário para o depósito.`;
+            $('#moveMaxInfo').textContent = `Disponível no Mostruário: ${bike.qty_mostruario}`;
+            $('#moveQuantity').max = bike.qty_mostruario;
+            if (bike.qty_mostruario <= 0) {
+                showToast('⚠ Não há unidades no mostruário para retornar');
+                return;
+            }
+        }
+
+        openModal('modalMoveStock');
+    }
+
+    async function confirmMoveStock() {
+        const id = $('#moveBikeId').value;
+        const direction = $('#moveDirection').value;
+        const qty = parseInt($('#moveQuantity').value) || 0;
+        const bike = state.bikes.find(b => b.id === id);
+
+        if (!bike || qty <= 0) return;
+
+        if (direction === 'toShowroom') {
+            if (qty > bike.qty_deposito) {
+                showToast('⚠ Quantidade superior ao disponível no depósito');
+                return;
+            }
+            bike.qty_deposito -= qty;
+            bike.qty_mostruario += qty;
+        } else {
+            if (qty > bike.qty_mostruario) {
+                showToast('⚠ Quantidade superior ao disponível no mostruário');
+                return;
+            }
+            bike.qty_mostruario -= qty;
+            bike.qty_deposito += qty;
+        }
+
+        saveState();
+        renderBikes();
+        closeModal('modalMoveStock');
+        showToast('✅ Movimentação realizada com sucesso!');
+        await saveBikeToSupabase(bike);
+    }
+
+    async function deleteBike(id) {
+        if (!confirm('Tem certeza que deseja excluir esta bike do estoque?')) return;
+        state.bikes = state.bikes.filter(b => b.id !== id);
+        saveState();
+        renderBikes();
+        showToast('🗑 Bike excluída do estoque');
+        await deleteBikeSupabase(id);
     }
     
     function exportCaixaDetailed() {
@@ -2922,6 +3171,17 @@
         deleteIngredient, deleteRecipe, switchCalcTab,
         deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
         deleteCaixa,
+        // Estoque
+        renderBikes, saveBike, openMoveStock, confirmMoveStock, deleteBike,
+        // Modais genéricos
+        openModal: function(id) { 
+            const m = document.getElementById(id); 
+            if (m) m.classList.add('show'); 
+        },
+        closeModal: function(id) { 
+            const m = document.getElementById(id); 
+            if (m) m.classList.remove('show'); 
+        },
         toggleAllMktContacts, updateMktCount: updateMktSelectedCount,
         askAI,
         reuseCampaign: function(id) {
