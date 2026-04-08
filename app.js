@@ -1485,37 +1485,44 @@
         }
 
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">Nenhuma bike encontrada no estoque</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:4rem; color:var(--text-muted); background:rgba(255,255,255,0.01);">
+                <div style="font-size:2rem; margin-bottom:1rem; opacity:0.3;">🚲</div>
+                Nenhuma bike encontrada no estoque
+            </td></tr>`;
             return;
         }
 
         tbody.innerHTML = filtered.map(b => {
             const total = (b.qty_deposito || 0) + (b.qty_mostruario || 0);
-            const isLow = total === 0;
-            return `<tr style="border-top: 1px solid rgba(255,255,255,0.05); ${isLow ? 'opacity:0.6;' : ''}">
-                <td style="padding: 1.25rem 1rem;">
-                    <div style="font-weight:600; color:${isLow ? 'var(--text-muted)' : 'white'};">${esc(b.name)}</div>
-                    <div style="font-size:0.75rem; color:var(--text-muted);">${esc(b.model || '')}</div>
+            const isOut = total === 0;
+            
+            return `<tr style="${isOut ? 'opacity:0.6;' : ''}">
+                <td>
+                    <div style="font-weight:600; color:${isOut ? 'var(--text-muted)' : 'var(--text-primary)'};">${esc(b.name)}</div>
+                    <div class="bike-id-meta">${esc(b.model || 'Modelo não informado')}</div>
                 </td>
-                <td style="padding: 1rem;">${esc(b.brand || '-')}</td>
-                <td style="padding: 1rem; text-align:center;">
-                    <span style="font-size:0.8rem; background:rgba(255,255,255,0.05); padding:0.2rem 0.6rem; border-radius:6px; margin-right:4px;">${esc(b.size || '-')}</span>
-                    <span style="font-size:0.8rem; color:var(--text-muted);">${esc(b.color || '')}</span>
+                <td><span class="bike-brand-tag">${esc(b.brand || '-')}</span></td>
+                <td class="col-centered">
+                    <span style="font-size:0.8rem; background:rgba(255,255,255,0.05); padding:0.2rem 0.5rem; border-radius:4px;">${esc(b.size || '-')}</span>
+                    <span style="font-size:0.8rem; color:var(--text-muted); margin-left:4px;">${esc(b.color || '')}</span>
                 </td>
-                <td style="padding: 1rem; text-align:center; font-weight:600; background:rgba(108, 92, 231, 0.05);">${b.qty_deposito}</td>
-                <td style="padding: 1rem; text-align:center; font-weight:600; background:rgba(0, 206, 255, 0.05);">${b.qty_mostruario}</td>
-                <td style="padding: 1rem; text-align:center;">
-                    <div style="font-weight:700; color:${total > 0 ? 'var(--primary-light)' : '#ff4757'};">${total}</div>
+                <td class="col-deposito">${b.qty_deposito}</td>
+                <td class="col-mostruario">${b.qty_mostruario}</td>
+                <td class="col-total" style="color:${total > 0 ? 'var(--accent-4)' : 'var(--accent-2)'}">${total}</td>
+                <td class="col-centered">
+                    <span class="status-pill ${isOut ? 'status-outstock' : 'status-instock'}">
+                        ${isOut ? 'Esgotado' : 'Em Estoque'}
+                    </span>
                 </td>
-                <td style="padding: 1rem; text-align:right;">
+                <td class="col-right">
                     <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
-                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toShowroom')" title="Mover para Mostruário" style="background:rgba(108, 92, 231, 0.2); color:var(--primary-light); padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
+                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toShowroom')" title="Mover para Mostruário" style="background:rgba(108, 92, 231, 0.2); color:var(--accent-3); padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                         </button>
-                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toWarehouse')" title="Retornar ao Depósito" style="background:rgba(0, 206, 255, 0.1); color:#00CEFF; padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
+                        <button class="btn-action" onclick="GestaoStrada.openMoveStock('${b.id}', 'toWarehouse')" title="Retornar ao Depósito" style="background:rgba(0, 206, 255, 0.1); color:var(--accent-4); padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
                         </button>
-                        <button class="btn-action" onclick="GestaoStrada.deleteBike('${b.id}')" title="Excluir" style="background:rgba(255, 71, 87, 0.1); color:#ff4757; padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
+                        <button class="btn-action" onclick="GestaoStrada.deleteBike('${b.id}')" title="Excluir" style="background:rgba(239, 68, 68, 0.1); color:#EF4444; padding:0.5rem; border-radius:8px; border:none; cursor:pointer;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
