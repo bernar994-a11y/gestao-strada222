@@ -1392,6 +1392,90 @@ textarea {
     transform: scale(1);
 }
 
+/* Standalone Modals (Estoque, etc.) — modals that are NOT inside .modal-overlay */
+#modalAddBike,
+#modalMoveStock {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-base);
+    padding: 1rem;
+}
+
+#modalAddBike.show,
+#modalMoveStock.show {
+    opacity: 1;
+    pointer-events: all;
+}
+
+#modalAddBike .modal-content,
+#modalMoveStock .modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 0;
+    width: 100%;
+    transform: scale(0.9) translateY(20px);
+    transition: transform var(--transition-spring);
+    box-shadow: var(--shadow-lg);
+}
+
+#modalAddBike.show .modal-content,
+#modalMoveStock.show .modal-content {
+    transform: scale(1) translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 1.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.modal-close {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all var(--transition-fast);
+}
+
+.modal-close:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #EF4444;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+#modalAddBike .cost-form,
+#modalMoveStock .cost-form {
+    padding: 1.5rem 1.75rem;
+}
+
 .modal-icon {
     width: 56px;
     height: 56px;
@@ -2971,38 +3055,133 @@ input[type="password"]:focus {
    Estoque de Bikes (Strada BikeShop)
    ========================================== */
 
-#panelEstoque .preview-table th {
+/* Filter Bar */
+.inventory-filter-bar {
+    margin-bottom: 2rem;
+    background: rgba(255, 255, 255, 0.02);
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+/* Table Container */
+.inventory-table-container {
+    background: rgba(255, 255, 255, 0.01);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    overflow-x: auto;
+}
+
+/* Table */
+.inventory-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+.inventory-table th {
+    padding: 1rem;
+    color: var(--text-muted);
+    font-weight: 500;
     font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: rgba(255, 255, 255, 0.02);
+    text-align: left;
+}
+
+.inventory-table td {
+    padding: 1rem;
+    border-top: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.inventory-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Column helpers */
+.col-deposito {
+    background: rgba(108, 92, 231, 0.03);
+    text-align: center;
+    font-weight: 600;
+}
+
+.col-mostruario {
+    background: rgba(0, 206, 255, 0.03);
+    text-align: center;
+    font-weight: 600;
+}
+
+.col-total {
+    text-align: center;
+    font-weight: 700;
+}
+
+.col-centered {
+    text-align: center;
+}
+
+.col-right {
+    text-align: right;
+}
+
+/* Status Badges */
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-#panelEstoque .preview-table tr:hover {
-    background: rgba(255, 255, 255, 0.03);
+.status-instock {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
-.badge-qty {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 24px;
-    height: 24px;
-    padding: 0 8px;
-    border-radius: 12px;
+.status-outstock {
+    background: rgba(239, 68, 68, 0.1);
+    color: #EF4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Bike metadata */
+.bike-id-meta {
     font-size: 0.75rem;
-    font-weight: 700;
+    color: var(--text-muted);
 }
 
-.badge-deposito {
-    background: rgba(108, 92, 231, 0.2);
-    color: var(--accent-3);
+.bike-brand-tag {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
-.badge-mostruario {
-    background: rgba(0, 206, 255, 0.2);
-    color: var(--accent-4);
+/* Panel title layout */
+.panel-title-container {
+    flex: 1;
 }
 
+#panelEstoque > .panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: none;
+}
+
+/* Action Buttons */
 .btn-action {
     transition: all 0.2s ease;
 }
@@ -3018,12 +3197,12 @@ input[type="password"]:focus {
 
 /* Responsividade Estoque */
 @media (max-width: 768px) {
-    #panelEstoque .filter-bar div {
-        grid-template-columns: 1fr !important;
+    .inventory-filter-bar {
+        grid-template-columns: 1fr;
     }
-    
-    #panelEstoque .preview-table th, 
-    #panelEstoque .preview-table td {
-        padding: 0.75rem 0.5rem !important;
+
+    .inventory-table th,
+    .inventory-table td {
+        padding: 0.75rem 0.5rem;
     }
 }
