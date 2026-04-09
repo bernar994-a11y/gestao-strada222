@@ -1113,17 +1113,36 @@
                         <div class="estoque-resumo" id="estoqueResumo"></div>
 
                         <!-- Busca e Filtros -->
-                        <div class="inventory-filter-bar">
-                            <div class="form-group" style="margin:0">
-                                <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Busca Rápida</label>
-                                <div class="auth-field" style="margin:0">
+                        <div class="estoque-filters">
+                            <div class="form-group" style="flex: 2; margin:0">
+                                <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Buscar</label>
+                                <div class="auth-field">
                                     <div class="auth-input-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
                                     <input type="text" id="estoqueSearch" placeholder="Nome, marca ou modelo..." oninput="GestaoStrada.renderBikes()">
                                 </div>
                             </div>
-                            <div class="form-group" style="margin:0">
+                            <div class="form-group" style="flex: 1; margin:0">
                                 <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Marca</label>
-                                <select id="estoqueFilterMarca" onchange="GestaoStrada.renderBikes()" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1rem;"></select>
+                                <select id="estoqueFilterMarca" onchange="GestaoStrada.renderBikes()" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1.5rem;"></select>
+                            </div>
+                            <div class="form-group" style="flex: 1; margin:0">
+                                <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Disponibilidade</label>
+                                <select id="estoqueFilterStatus" onchange="GestaoStrada.renderBikes()" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1.5rem;">
+                                    <option value="all">Todos os Itens</option>
+                                    <option value="available">Em Estoque (>=1)</option>
+                                    <option value="low">Estoque Baixo (<3)</option>
+                                    <option value="out">Esgotados (0)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; margin:0">
+                                <label style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:block;">Organizar por</label>
+                                <select id="estoqueSort" onchange="GestaoStrada.renderBikes()" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1.5rem;">
+                                    <option value="name_asc">Nome (A-Z)</option>
+                                    <option value="name_desc">Nome (Z-A)</option>
+                                    <option value="brand">Marca</option>
+                                    <option value="qty_desc">Maior Estoque</option>
+                                    <option value="qty_asc">Menor Estoque</option>
+                                </select>
                             </div>
                         </div>
 

@@ -1460,7 +1460,7 @@
         } catch (e) { }
     }
 
-    // Helper functions for modals
+        // Helper functions for modals
     function _openModal(id) {
         const m = document.getElementById(id);
         if (m) m.classList.add('show');
@@ -1474,19 +1474,48 @@
         if (state.currentUnit !== 'bikeshop') return;
         const search = ($('#estoqueSearch') ? $('#estoqueSearch').value.toLowerCase() : '');
         const filterMarca = ($('#estoqueFilterMarca') ? $('#estoqueFilterMarca').value : '');
+        const filterStatus = ($('#estoqueFilterStatus') ? $('#estoqueFilterStatus').value : 'all');
+        const sortBy = ($('#estoqueSort') ? $('#estoqueSort').value : 'name_asc');
+
         const container = $('#estoqueCardList');
         if (!container) return;
 
         let filtered = state.bikes.filter(b => {
-            const matchSearch = b.name.toLowerCase().includes(search) || 
-                                (b.brand && b.brand.toLowerCase().includes(search)) || 
-                                (b.model && b.model.toLowerCase().includes(search));
-            const matchMarca = filterMarca === '' || b.brand === filterMarca;
-            return matchSearch && matchMarca;
+            const matchesUnit = b.unit_id === state.currentUnit;
+            const matchesSearch = b.name.toLowerCase().includes(search) || 
+                                 (b.brand && b.brand.toLowerCase().includes(search)) || 
+                                 (b.model && b.model.toLowerCase().includes(search));
+            const matchesMarca = !filterMarca || b.brand === filterMarca;
+            
+            const totalStock = (b.qty_deposito || 0) + (b.qty_mostruario || 0);
+            let matchesStatus = true;
+            if (filterStatus === 'available') matchesStatus = totalStock >= 1;
+            else if (filterStatus === 'low') matchesStatus = totalStock > 0 && totalStock < 3;
+            else if (filterStatus === 'out') matchesStatus = totalStock === 0;
+
+            return matchesUnit && matchesSearch && matchesMarca && matchesStatus;
+        });
+
+        // Aplicar Ordenação
+        filtered.sort((a, b) => {
+            if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+            if (sortBy === 'name_desc') return b.name.localeCompare(a.name);
+            if (sortBy === 'brand') return (a.brand || '').localeCompare(b.brand || '');
+            if (sortBy === 'qty_desc') {
+                const totalA = (a.qty_deposito || 0) + (a.qty_mostruario || 0);
+                const totalB = (b.qty_deposito || 0) + (b.qty_mostruario || 0);
+                return totalB - totalA;
+            }
+            if (sortBy === 'qty_asc') {
+                const totalA = (a.qty_deposito || 0) + (a.qty_mostruario || 0);
+                const totalB = (b.qty_deposito || 0) + (b.qty_mostruario || 0);
+                return totalA - totalB;
+            }
+            return 0;
         });
 
         // Atualizar Filtro de Marcas
-        const marcas = [...new Set(state.bikes.map(b => b.brand))].filter(Boolean).sort();
+        const marcas = [...new Set(state.bikes.filter(b => b.unit_id === state.currentUnit).map(b => b.brand))].filter(Boolean).sort();
         const filterMarcaEl = $('#estoqueFilterMarca');
         if (filterMarcaEl && filterMarcaEl.options.length <= 1) {
             filterMarcaEl.innerHTML = '<option value="">Todas as Marcas</option>' + 
