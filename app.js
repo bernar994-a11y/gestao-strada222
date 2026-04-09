@@ -1678,6 +1678,11 @@
         }
     }
 
+    function triggerEstoqueImport() {
+        const inp = $('#estoqueFileInput');
+        if (inp) inp.click();
+    }
+
     async function importEstoque(file) {
         if (typeof XLSX === 'undefined') {
             showToast('⚠ Erro: biblioteca de planilha não carregada');
@@ -3341,7 +3346,7 @@
         deleteCaixa,
         // Estoque
         renderBikes, saveBike, openMoveStock, confirmMoveStock, deleteBike,
-        handleEstoqueImport,
+        handleEstoqueImport, openEstoqueImport: triggerEstoqueImport,
         printEstoqueDemonstrativo,
         // Modais genéricos
         openModal: _openModal,
