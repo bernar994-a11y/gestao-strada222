@@ -1708,27 +1708,48 @@
                     const col1 = String(row[0] || '').trim();
                     const col2 = row[1];
 
-                    // Ignorar cabeçalho se detectado (ex: "TIPO" ou similar)
-                    if (col1.toLowerCase().includes('tipo<') || col1.toLowerCase() === 'produto' || col1.toLowerCase() === 'item') continue;
-                    if (!col1.includes('<')) continue;
+                    if (!col1) continue;
 
-                    const parts = col1.split('<').map(p => p.trim());
-                    if (parts.length < 3) continue;
+                    // Tentar identificar o separador automático
+                    const delimiters = ['<', ';', '|', '-', '/'];
+                    let separator = delimiters.find(d => col1.includes(d));
+                    
+                    // Se não tiver separador especial mas começar com BIC, tenta usar espaços
+                    if (!separator && col1.toLowerCase().startsWith('bic')) {
+                        separator = ' ';
+                    }
 
-                    const sizeRaw = parts[3] || '';
-                    const size = sizeRaw.replace(/TAM\s*=\s*/i, '').trim();
+                    if (!separator) {
+                        // Se for apenas uma coluna com o nome, tenta processar como bike simples
+                        if (col1.toLowerCase().startsWith('bic')) {
+                            separator = '___NON_EXISTENT___'; // Forçar split único
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    const parts = col1.split(separator).map(p => p.trim());
+                    
+                    // Se for cabeçalho óbvio (apenas nomes dos campos), ignora
+                    if (col1.toLowerCase().includes('nome da bike') || col1.toLowerCase() === 'produto') continue;
 
                     const bike = {
                         id: 'bike_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                        name: parts[2] || 'Sem Nome',
-                        brand: parts[5] || '',
+                        name: parts[2] || parts[0], // Pega a parte 2 ou o nome inteiro
+                        brand: parts[5] || parts[parts.length - 1] || '',
                         model: parts[1] || '',
-                        size: size,
+                        size: (parts[3] || '').replace(/TAM\s*=\s*/i, '').replace(/TAM/i, '').trim(),
                         color: parts[4] || '',
                         qty_deposito: parseInt(col2) || 0,
                         qty_mostruario: 0,
                         unit_id: state.currentUnit
                     };
+
+                    // Ajuste fino se for apenas nome no Col1
+                    if (parts.length === 1) {
+                        bike.name = col1;
+                        bike.brand = '';
+                    }
 
                     newBikes.push(bike);
                     state.bikes.push(bike);
