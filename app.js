@@ -148,8 +148,14 @@
                 .select('*')
                 .eq('unit_id', state.currentUnit);
 
-            if (errCosts || errCats || errCarnes) {
-                console.warn('Erro ao carregar do Supabase:', errCosts || errCats || errCarnes);
+            // 5. Carregar Estoque de Bikes
+            const { data: bikesData, error: errBikes } = await supabase
+                .from('estoque_bikes')
+                .select('*')
+                .eq('unit_id', state.currentUnit);
+
+            if (errCosts || errCats || errCarnes || errBikes || errCaixa) {
+                console.warn('Erro ao carregar do Supabase:', errCosts || errCats || errCarnes || errBikes || errCaixa);
                 return false;
             }
 
@@ -267,12 +273,6 @@
             } else {
                 state.caixa = [];
             }
-
-            // 5. Carregar Estoque de Bikes
-            const { data: bikesData, error: errBikes } = await supabase
-                .from('estoque_bikes')
-                .select('*')
-                .eq('unit_id', state.currentUnit);
 
             if (bikesData) {
                 state.bikes = bikesData.map(b => ({
@@ -1668,6 +1668,86 @@
         renderBikes();
         showToast('🗑 Bike excluída do estoque');
         await deleteBikeSupabase(id);
+    }
+
+    function handleEstoqueImport(event) {
+        const file = event.target.files[0];
+        if (file) {
+            importEstoque(file);
+            event.target.value = ''; // Reset input
+        }
+    }
+
+    async function importEstoque(file) {
+        if (typeof XLSX === 'undefined') {
+            showToast('⚠ Erro: biblioteca de planilha não carregada');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                let imported = 0;
+                const newBikes = [];
+
+                // Pular cabeçalho se houver (assumindo que a primeira linha pode ser cabeçalho se contiver "TIPO" ou algo assim)
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length < 1) continue;
+
+                    const col1 = String(row[0] || '').trim();
+                    const col2 = row[1];
+
+                    // Ignorar cabeçalho se detectado (ex: "TIPO" ou similar)
+                    if (col1.toLowerCase().includes('tipo<') || col1.toLowerCase() === 'produto' || col1.toLowerCase() === 'item') continue;
+                    if (!col1.includes('<')) continue;
+
+                    const parts = col1.split('<').map(p => p.trim());
+                    if (parts.length < 3) continue;
+
+                    const sizeRaw = parts[3] || '';
+                    const size = sizeRaw.replace(/TAM\s*=\s*/i, '').trim();
+
+                    const bike = {
+                        id: 'bike_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                        name: parts[2] || 'Sem Nome',
+                        brand: parts[5] || '',
+                        model: parts[1] || '',
+                        size: size,
+                        color: parts[4] || '',
+                        qty_deposito: parseInt(col2) || 0,
+                        qty_mostruario: 0,
+                        unit_id: state.currentUnit
+                    };
+
+                    newBikes.push(bike);
+                    state.bikes.push(bike);
+                    imported++;
+                }
+
+                if (imported > 0) {
+                    saveState();
+                    renderBikes();
+                    showToast(`✅ ${imported} bikes importadas com sucesso!`);
+                    
+                    // Sincronizar com Supabase (em lote ou sequencial)
+                    for (const bike of newBikes) {
+                        await saveBikeToSupabase(bike);
+                    }
+                } else {
+                    showToast('⚠ Nenhuma bike válida encontrada na planilha');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('⚠ Erro ao ler o arquivo. Verifique o formato.');
+            }
+        };
+        reader.readAsArrayBuffer(file);
     }
     
     function printEstoqueDemonstrativo() {
@@ -3261,6 +3341,7 @@
         deleteCaixa,
         // Estoque
         renderBikes, saveBike, openMoveStock, confirmMoveStock, deleteBike,
+        handleEstoqueImport,
         printEstoqueDemonstrativo,
         // Modais genéricos
         openModal: _openModal,
