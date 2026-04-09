@@ -1394,7 +1394,8 @@ textarea {
 
 /* Standalone Modals (Estoque, etc.) — modals that are NOT inside .modal-overlay */
 #modalAddBike,
-#modalMoveStock {
+#modalMoveStock,
+#modalImportReview {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
@@ -1411,13 +1412,15 @@ textarea {
 }
 
 #modalAddBike.show,
-#modalMoveStock.show {
+#modalMoveStock.show,
+#modalImportReview.show {
     opacity: 1;
     pointer-events: all;
 }
 
 #modalAddBike .modal-content,
-#modalMoveStock .modal-content {
+#modalMoveStock .modal-content,
+#modalImportReview .modal-content {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-xl);
