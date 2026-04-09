@@ -1184,6 +1184,36 @@
         </div>
     </div>
 
+    <div class="modal" id="modalImportReview">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3>🔍 Revisar Importação</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalImportReview')">&times;</button>
+            </div>
+            <div class="panel-subtitle" style="margin-bottom: 1rem; padding: 0 1.5rem; color: var(--text-muted);">
+                Confirme se as informações foram identificadas corretamente abaixo.
+            </div>
+            <div style="padding: 0 1.5rem; max-height: 400px; overflow-y: auto;">
+                <table class="cost-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">
+                            <th style="padding: 0.5rem;">Nome/Modelo</th>
+                            <th style="padding: 0.5rem;">Marca</th>
+                            <th style="padding: 0.5rem;">Tam</th>
+                            <th style="padding: 0.5rem;">Cor</th>
+                            <th style="padding: 0.5rem; text-align: center;">Qtd</th>
+                        </tr>
+                    </thead>
+                    <tbody id="importReviewBodyBody"></tbody>
+                </table>
+            </div>
+            <div class="modal-actions" style="margin-top: 1.5rem; padding: 0 1.5rem 1.5rem;">
+                <button class="btn-secondary" onclick="GestaoStrada.closeModal('modalImportReview')" style="width: 100px;">Cancelar</button>
+                <button class="btn-primary" id="btnConfirmImport" style="flex: 1;">Confirmar e Salvar Tudo</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div class="toast" id="toast"><span class="toast-message" id="toastMessage"></span></div>
 

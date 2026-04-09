@@ -1670,6 +1670,8 @@
         await deleteBikeSupabase(id);
     }
 
+    let tempImportBikes = [];
+
     function handleEstoqueImport(event) {
         const file = event.target.files[0];
         if (file) {
@@ -1697,83 +1699,130 @@
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-                let imported = 0;
-                const newBikes = [];
-
-                // Pular cabeçalho se houver (assumindo que a primeira linha pode ser cabeçalho se contiver "TIPO" ou algo assim)
-                for (let i = 0; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (!row || row.length < 1) continue;
-
-                    const col1 = String(row[0] || '').trim();
-                    const col2 = row[1];
-
-                    if (!col1) continue;
-
-                    // Tentar identificar o separador automático
-                    const delimiters = ['<', ';', '|', '-', '/'];
-                    let separator = delimiters.find(d => col1.includes(d));
-                    
-                    // Se não tiver separador especial mas começar com BIC, tenta usar espaços
-                    if (!separator && col1.toLowerCase().startsWith('bic')) {
-                        separator = ' ';
-                    }
-
-                    if (!separator) {
-                        // Se for apenas uma coluna com o nome, tenta processar como bike simples
-                        if (col1.toLowerCase().startsWith('bic')) {
-                            separator = '___NON_EXISTENT___'; // Forçar split único
-                        } else {
-                            continue;
-                        }
-                    }
-
-                    const parts = col1.split(separator).map(p => p.trim());
-                    
-                    // Se for cabeçalho óbvio (apenas nomes dos campos), ignora
-                    if (col1.toLowerCase().includes('nome da bike') || col1.toLowerCase() === 'produto') continue;
-
-                    const bike = {
-                        id: 'bike_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-                        name: parts[2] || parts[0], // Pega a parte 2 ou o nome inteiro
-                        brand: parts[5] || parts[parts.length - 1] || '',
-                        model: parts[1] || '',
-                        size: (parts[3] || '').replace(/TAM\s*=\s*/i, '').replace(/TAM/i, '').trim(),
-                        color: parts[4] || '',
-                        qty_deposito: parseInt(col2) || 0,
-                        qty_mostruario: 0,
-                        unit_id: state.currentUnit
-                    };
-
-                    // Ajuste fino se for apenas nome no Col1
-                    if (parts.length === 1) {
-                        bike.name = col1;
-                        bike.brand = '';
-                    }
-
-                    newBikes.push(bike);
-                    state.bikes.push(bike);
-                    imported++;
+                if (rows.length < 1) {
+                    showToast('⚠ Planilha vazia');
+                    return;
                 }
 
-                if (imported > 0) {
-                    saveState();
-                    renderBikes();
-                    showToast(`✅ ${imported} bikes importadas com sucesso!`);
-                    
-                    // Sincronizar com Supabase (em lote ou sequencial)
-                    for (const bike of newBikes) {
-                        await saveBikeToSupabase(bike);
+                tempImportBikes = [];
+                let importedCount = 0;
+
+                // 1. Identificar Mapeamento de Colunas (Inteligente)
+                let map = { name: -1, brand: -1, model: -1, size: -1, color: -1, qty: -1, combined: -1 };
+                
+                // Analisar as primeiras 5 linhas para encontrar cabeçalhos ou padrões
+                for (let i = 0; i < Math.min(5, rows.length); i++) {
+                    const row = rows[i];
+                    row.forEach((cell, idx) => {
+                        const val = String(cell || '').toLowerCase().trim();
+                        if (val.includes('nome') || val.includes('produto') || val.includes('bike') || val.includes('descri')) map.name = idx;
+                        if (val.includes('marca') || val.includes('brand')) map.brand = idx;
+                        if (val.includes('modelo') || val.includes('ano') || val.includes('model')) map.model = idx;
+                        if (val.includes('tam') || val.includes('size')) map.size = idx;
+                        if (val.includes('cor') || val.includes('color')) map.color = idx;
+                        if (val.includes('qtd') || val.includes('quant') || val.includes('estoque') || val.includes('deposito')) map.qty = idx;
+                        if (val.includes('<') || val.includes(';')) map.combined = idx;
+                    });
+                }
+
+                // Se não achou colunas específicas, assume Column 0 as Combined e Column 1 as Qty (fallback do usuário)
+                if (map.name === -1 && map.combined === -1) map.combined = 0;
+                if (map.qty === -1) map.qty = 1;
+
+                // 2. Processar Linhas
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length === 0) continue;
+
+                    let bike = {
+                        id: 'bike_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                        name: '', brand: '', model: '', size: '', color: '', 
+                        qty_deposito: 0, qty_mostruario: 0, unit_id: state.currentUnit
+                    };
+
+                    const firstCell = String(row[0] || '').toLowerCase();
+                    if (firstCell.includes('nome') || firstCell.includes('tipo<')) continue; // Pular cabeçalho
+
+                    // Se encontrou formato combinado (BIC<2024<...)
+                    if (map.combined !== -1 && String(row[map.combined] || '').includes('<')) {
+                        const val = String(row[map.combined]);
+                        const parts = val.split('<').map(p => p.trim());
+                        bike.model = parts[1] || '';
+                        bike.name = parts[2] || parts[0];
+                        bike.size = (parts[3] || '').replace(/TAM\s*=\s*/i, '').trim();
+                        bike.color = parts[4] || '';
+                        bike.brand = parts[5] || '';
+                    } else if (map.combined !== -1 && String(row[map.combined] || '').includes(';')) {
+                        const val = String(row[map.combined]);
+                        const parts = val.split(';').map(p => p.trim());
+                        bike.name = parts[0];
+                        bike.qty_deposito = parseInt(parts[1]) || 0;
+                    } else {
+                        // Mapeamento por colunas individuais
+                        if (map.name !== -1) bike.name = String(row[map.name] || '');
+                        if (map.brand !== -1) bike.brand = String(row[map.brand] || '');
+                        if (map.model !== -1) bike.model = String(row[map.model] || '');
+                        if (map.size !== -1) bike.size = String(row[map.size] || '').replace(/TAM\s*=\s*/i, '').trim();
+                        if (map.color !== -1) bike.color = String(row[map.color] || '');
                     }
+
+                    // Quantidade sempre da coluna mapeada ou Coluna 2 (index 1) padrão
+                    const qtyVal = row[map.qty] || row[1];
+                    bike.qty_deposito = parseInt(qtyVal) || 0;
+
+                    if (bike.name && bike.name.toLowerCase() !== 'nome' && bike.name.toLowerCase() !== 'produto') {
+                        tempImportBikes.push(bike);
+                        importedCount++;
+                    }
+                }
+
+                if (tempImportBikes.length > 0) {
+                    showImportReview();
                 } else {
-                    showToast('⚠ Nenhuma bike válida encontrada na planilha');
+                    showToast('⚠ Nenhuma bike identificada. Verifique o formato.');
                 }
             } catch (err) {
                 console.error(err);
-                showToast('⚠ Erro ao ler o arquivo. Verifique o formato.');
+                showToast('⚠ Erro ao ler planilha.');
             }
         };
         reader.readAsArrayBuffer(file);
+    }
+
+    function showImportReview() {
+        const body = $('#importReviewBodyBody');
+        if (!body) return;
+
+        body.innerHTML = tempImportBikes.map(b => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 0.5rem; font-weight: 600;">${esc(b.name)} ${b.model ? '<span style="color:var(--text-muted); font-weight:400;">(' + esc(b.model) + ')</span>' : ''}</td>
+                <td style="padding: 0.5rem;">${esc(b.brand)}</td>
+                <td style="padding: 0.5rem;">${esc(b.size)}</td>
+                <td style="padding: 0.5rem;">${esc(b.color)}</td>
+                <td style="padding: 0.5rem; text-align: center; color: var(--accent-1); font-weight: 700;">${b.qty_deposito}</td>
+            </tr>
+        `).join('');
+
+        const btn = $('#btnConfirmImport');
+        btn.onclick = async () => {
+            btn.disabled = true;
+            btn.textContent = 'Salvando...';
+            
+            for (const b of tempImportBikes) {
+                state.bikes.push(b);
+                await saveBikeToSupabase(b);
+            }
+            
+            saveState();
+            renderBikes();
+            _closeModal('modalImportReview');
+            showToast(`✅ ${tempImportBikes.length} bikes importadas com sucesso!`);
+            
+            btn.disabled = false;
+            btn.textContent = 'Confirmar e Salvar Tudo';
+        };
+
+        _openModal('modalImportReview');
     }
     
     function printEstoqueDemonstrativo() {
