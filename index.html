@@ -517,35 +517,7 @@
                     </div>
                 </section>
 
-                <div id="modalCaixaReport">
-        <div class="modal-content" style="max-width: 900px;">
-            <div class="modal-header">
-                <h3>📋 Relatório Detalhado de Caixa</h3>
-                <button class="modal-close" onclick="GestaoStrada.closeModal('modalCaixaReport')">&times;</button>
-            </div>
-            <div class="panel-subtitle" style="margin-bottom: 1rem; padding: 0 1.5rem; color: var(--text-muted);">
-                Detalhamento completo dos fluxos de caixa para a unidade selecionada.
-            </div>
-            <div style="padding: 0 1.5rem; max-height: 450px; overflow-y: auto;">
-                <table class="cost-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                    <thead>
-                        <tr style="text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">
-                            <th style="padding: 0.75rem;">Data</th>
-                            <th style="padding: 0.75rem;">Turno</th>
-                            <th style="padding: 0.75rem;">Valor Bruto</th>
-                            <th style="padding: 0.75rem;">Diferença</th>
-                            <th style="padding: 0.75rem;">Total Líquido</th>
-                            <th style="padding: 0.75rem;">Observações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="caixaReportBody"></tbody>
-                </table>
-            </div>
-            <div id="caixaReportFooter" style="margin-top: 1rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 0 0 16px 16px; border-top: 1px solid rgba(255,255,255,0.05);">
-                <!-- Totals will be rendered here -->
-            </div>
-        </div>
-    </div>
+
 
     <!-- Modal Review Import -->
                 <section class="panel" id="panelExport">
@@ -1242,6 +1214,37 @@
                 </div>
                 <button type="submit" class="btn-primary" style="width:100%; margin-top: 1rem;" id="btnConfirmMove">Confirmar Movimentação</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal Detailed Caixa Report -->
+    <div id="modalCaixaReport" class="modal-overlay">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3>📋 Relatório Detalhado de Caixa</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalCaixaReport')">&times;</button>
+            </div>
+            <div class="panel-subtitle" style="margin-bottom: 1rem; padding: 0 1.5rem; color: var(--text-muted);">
+                Detalhamento completo dos fluxos de caixa para a unidade selecionada.
+            </div>
+            <div style="padding: 0 1.5rem; max-height: 450px; overflow-y: auto;">
+                <table class="cost-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="text-align: left; border-bottom: 2px solid rgba(255,255,255,0.1);">
+                            <th style="padding: 0.75rem;">Data</th>
+                            <th style="padding: 0.75rem;">Turno</th>
+                            <th style="padding: 0.75rem;">Valor Bruto</th>
+                            <th style="padding: 0.75rem;">Diferença</th>
+                            <th style="padding: 0.75rem;">Total Líquido</th>
+                            <th style="padding: 0.75rem;">Observações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="caixaReportBody"></tbody>
+                </table>
+            </div>
+            <div id="caixaReportFooter" style="margin-top: 1rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 0 0 16px 16px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <!-- Totals will be rendered here -->
+            </div>
         </div>
     </div>
 
