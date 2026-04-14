@@ -1396,27 +1396,40 @@ textarea {
 #modalAddBike,
 #modalMoveStock,
 #modalImportReview,
-#modalCaixaReport {
+#modalCaixaReport,
+#modalBalanceSelect {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    z-index: 500;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition-base);
-    padding: 1rem;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
 }
 
 #modalAddBike.show,
 #modalMoveStock.show,
-#modalImportReview.show {
-    opacity: 1;
-    pointer-events: all;
+#modalImportReview.show,
+#modalCaixaReport.show,
+#modalBalanceSelect.show {
+    display: flex;
+}
+
+/* Print Styles for Financial Reports */
+@media print {
+    body * { visibility: hidden; }
+    .print-container, .print-container * { visibility: visible; }
+    .print-container {
+        position: absolute;
+        left: 0; top: 0; width: 100%;
+        padding: 0;
+        background: white !important;
+        color: black !important;
+    }
+    .no-print { display: none !important; }
+    .chart-canvas { max-width: 100% !important; height: auto !important; }
+    @page { margin: 1cm; }
 }
 
 #modalAddBike .modal-content,

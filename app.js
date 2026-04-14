@@ -2945,152 +2945,287 @@
     function renderCostEvolution() {
         const container = $('#evolutionContent');
         if (!container) return;
-        if (state.costs.length === 0) {
-            container.innerHTML = '<div class="empty-state"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><p>Adicione custos para ver a evolução</p></div>';
+        if (state.costs.length === 0 && (state.caixa || []).length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>Adicione dados para ver a evolução</p></div>';
             return;
         }
 
-        const monthMap = {};
+        const costMonthMap = {};
+        const caixaMonthMap = {};
         const catMap = {}; // category per month
+        
         state.costs.forEach(c => {
             const d = new Date(c.date + 'T12:00:00');
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            if (!monthMap[key]) monthMap[key] = 0;
-            monthMap[key] += c.value;
+            costMonthMap[key] = (costMonthMap[key] || 0) + c.value;
             if (!catMap[key]) catMap[key] = {};
             const cat = state.categories.find(cat => cat.id === c.categoryId);
             const catName = cat ? cat.name : 'Outros';
             catMap[key][catName] = (catMap[key][catName] || 0) + c.value;
         });
 
-        const months = Object.keys(monthMap).sort();
-        const maxValue = Math.max(...months.map(m => monthMap[m]));
+        (state.caixa || []).forEach(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            caixaMonthMap[key] = (caixaMonthMap[key] || 0) + (c.value + (c.diferenca || 0));
+        });
+
+        const allMonthKeys = [...new Set([...Object.keys(costMonthMap), ...Object.keys(caixaMonthMap)])].sort();
+        const months = allMonthKeys.slice(-12); // Last 12 months
+        
+        const maxValue = Math.max(
+            ...months.map(m => costMonthMap[m] || 0),
+            ...months.map(m => caixaMonthMap[m] || 0),
+            100 // Avoid division by zero
+        );
+
         const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const brandColors = ['#F5A623', '#6C5CE7', '#10B981', '#EF4444', '#3B82F6', '#EC4899', '#F59E0B', '#8B5CF6'];
 
-        // Summary cards
-        const totalAll = months.reduce((s, m) => s + monthMap[m], 0);
-        const avgMonth = totalAll / months.length;
-        const lastMonth = months.length >= 1 ? monthMap[months[months.length - 1]] : 0;
-        const prevMonthVal = months.length >= 2 ? monthMap[months[months.length - 2]] : 0;
-        const trend = prevMonthVal > 0 ? ((lastMonth - prevMonthVal) / prevMonthVal * 100) : 0;
-        const trendColor = trend > 0 ? '#EF4444' : trend < 0 ? '#10B981' : 'var(--text-muted)';
-        const trendIcon = trend > 0 ? '📈' : trend < 0 ? '📉' : '➡️';
+        // Summary cards (current unit totals)
+        const totalCosts = months.reduce((s, m) => s + (costMonthMap[m] || 0), 0);
+        const totalCaixa = months.reduce((s, m) => s + (caixaMonthMap[m] || 0), 0);
+        const totalProfit = totalCaixa - totalCosts;
 
         let summaryHtml = `<div class="evolution-summary">
-            <div class="evo-summary-card"><span class="evo-summary-label">Média Mensal</span><span class="evo-summary-value">${formatCurrency(avgMonth)}</span></div>
-            <div class="evo-summary-card"><span class="evo-summary-label">Último Mês</span><span class="evo-summary-value">${formatCurrency(lastMonth)}</span></div>
-            <div class="evo-summary-card"><span class="evo-summary-label">Tendência</span><span class="evo-summary-value" style="color:${trendColor}">${trendIcon} ${trend > 0 ? '+' : ''}${trend.toFixed(1)}%</span></div>
-            <div class="evo-summary-card"><span class="evo-summary-label">Total Acumulado</span><span class="evo-summary-value">${formatCurrency(totalAll)}</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Receita (Período)</span><span class="evo-summary-value" style="color:#10B981">${formatCurrency(totalCaixa)}</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Despesas (Período)</span><span class="evo-summary-value" style="color:#F5A623">${formatCurrency(totalCosts)}</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Resultado Final</span><span class="evo-summary-value" style="color:${totalProfit >= 0 ? '#10B981' : '#EF4444'}">${formatCurrency(totalProfit)}</span></div>
+            <div class="evo-summary-card"><span class="evo-summary-label">Média Lucro</span><span class="evo-summary-value">${formatCurrency(totalProfit / (months.length || 1))}</span></div>
         </div>`;
 
-        // Canvas chart
-        let chartHtml = `<div class="evo-canvas-wrapper"><canvas id="evoCanvas" width="700" height="220"></canvas></div>`;
+        let chartHtml = `<div class="evo-canvas-wrapper" style="margin-top:1rem"><canvas id="evoCanvas" width="700" height="250"></canvas></div>`;
 
-        // Bar rows
-        let barsHtml = '<div class="evolution-chart">';
+        let barsHtml = '<div class="evolution-chart" style="margin-top:2rem">';
         months.forEach((m, i) => {
             const [year, month] = m.split('-');
             const label = `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`;
-            const value = monthMap[m];
-            const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
-            let variation = '';
-            let variationClass = '';
-            if (i > 0) {
-                const prev = monthMap[months[i - 1]];
-                const pctChange = prev > 0 ? ((value - prev) / prev * 100) : 0;
-                if (pctChange > 0) { variation = `<span class="evolution-up">↑ +${pctChange.toFixed(1)}%</span>`; variationClass = 'evo-up'; }
-                else if (pctChange < 0) { variation = `<span class="evolution-down">↓ ${pctChange.toFixed(1)}%</span>`; variationClass = 'evo-down'; }
-                else { variation = `<span class="evolution-neutral">= 0%</span>`; }
-            }
-            // Category mini bars
-            const cats = catMap[m] || {};
-            const catEntries = Object.entries(cats).sort((a, b) => b[1] - a[1]);
-            const catBars = catEntries.slice(0, 3).map((ce, ci) => {
-                const catPct = value > 0 ? (ce[1] / value * 100) : 0;
-                return `<div class="evo-cat-chip" style="background:${brandColors[ci % brandColors.length]};width:${Math.max(catPct, 8)}%" title="${ce[0]}: ${formatCurrency(ce[1])}">${ce[0].substring(0, 8)}</div>`;
-            }).join('');
-
-            barsHtml += `<div class="evolution-row ${variationClass}" style="animation-delay:${i * 0.06}s">
-                <div class="evo-label">${label}</div>
-                <div class="evo-bar-wrapper"><div class="evo-bar" style="width:${pct}%"></div></div>
-                <div class="evo-value">${formatCurrency(value)}</div>
-                <div class="evo-variation">${variation}</div>
-            </div>
-            <div class="evo-cat-row">${catBars}</div>`;
+            const costVal = costMonthMap[m] || 0;
+            const caixaVal = caixaMonthMap[m] || 0;
+            const profitVal = caixaVal - costVal;
+            
+            barsHtml += `<div class="evolution-row" style="animation-delay:${i * 0.06}s; padding:1rem 0; border-bottom:1px solid rgba(255,255,255,0.05)">
+                <div class="evo-label" style="width:80px; font-weight:700">${label}</div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem">
+                    <div style="display:flex; align-items:center; gap:0.75rem">
+                       <div style="flex:1; height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
+                           <div style="width:${(caixaVal/maxValue)*100}%; height:100%; background:#10B981"></div>
+                       </div>
+                       <span style="font-size:0.75rem; width:100px; text-align:right; color:#10B981">${formatCurrency(caixaVal)}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.75rem">
+                       <div style="flex:1; height:8px; background:rgba(255,255,255,0.05); border-radius:4px; overflow:hidden;">
+                           <div style="width:${(costVal/maxValue)*100}%; height:100%; background:#F5A623"></div>
+                       </div>
+                       <span style="font-size:0.75rem; width:100px; text-align:right; color:#F5A623">${formatCurrency(costVal)}</span>
+                    </div>
+                </div>
+                <div style="width:120px; text-align:right; font-weight:800; color:${profitVal >= 0 ? '#10B981' : '#EF4444'}">
+                    ${profitVal >= 0 ? '+' : ''}${formatCurrency(profitVal)}
+                </div>
+            </div>`;
         });
         barsHtml += '</div>';
 
         container.innerHTML = summaryHtml + chartHtml + barsHtml;
 
-        // Draw canvas chart
         requestAnimationFrame(() => {
             const canvas = document.getElementById('evoCanvas');
             if (!canvas || months.length < 2) return;
             const ctx = canvas.getContext('2d');
             const W = canvas.width;
             const H = canvas.height;
-            const padding = { top: 20, right: 20, bottom: 30, left: 60 };
+            const padding = { top: 30, right: 30, bottom: 40, left: 70 };
             const chartW = W - padding.left - padding.right;
             const chartH = H - padding.top - padding.bottom;
 
             ctx.clearRect(0, 0, W, H);
 
-            // Grid lines
-            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+            // X-Axis Labels (Months)
+            months.forEach((m, i) => {
+                const x = padding.left + (i / (months.length - 1)) * chartW;
+                const [, month] = m.split('-');
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.font = '10px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(monthNames[parseInt(month)-1], x, H - 15);
+            });
+
+            // Grid & Y-Axis
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
             ctx.lineWidth = 1;
-            for (let i = 0; i <= 4; i++) {
+            for(let i=0; i<=4; i++) {
                 const y = padding.top + (chartH / 4) * i;
                 ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(W - padding.right, y); ctx.stroke();
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                ctx.font = '10px Inter';
                 ctx.textAlign = 'right';
-                ctx.fillText(formatCurrency(maxValue * (1 - i / 4)), padding.left - 5, y + 3);
+                ctx.fillText(formatCurrency(maxValue * (1 - i/4)), padding.left - 10, y + 4);
             }
 
-            // Data points
-            const points = months.map((m, i) => ({
-                x: padding.left + (i / (months.length - 1)) * chartW,
-                y: padding.top + chartH - (monthMap[m] / maxValue) * chartH
-            }));
+            function drawLine(dataMap, color, label) {
+                const points = months.map((m, i) => ({
+                    x: padding.left + (i / (months.length - 1)) * chartW,
+                    y: padding.top + chartH - ((dataMap[m] || 0) / maxValue) * chartH
+                }));
 
-            // Gradient fill
-            const gradient = ctx.createLinearGradient(0, padding.top, 0, H - padding.bottom);
-            gradient.addColorStop(0, 'rgba(245, 166, 35, 0.25)');
-            gradient.addColorStop(1, 'rgba(245, 166, 35, 0)');
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, H - padding.bottom);
-            points.forEach(p => ctx.lineTo(p.x, p.y));
-            ctx.lineTo(points[points.length - 1].x, H - padding.bottom);
-            ctx.closePath();
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            // Line
-            ctx.beginPath();
-            ctx.strokeStyle = '#F5A623';
-            ctx.lineWidth = 2.5;
-            ctx.lineJoin = 'round';
-            points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-            ctx.stroke();
-
-            // Dots + labels
-            points.forEach((p, i) => {
+                // Line
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#F5A623';
-                ctx.fill();
-                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.lineJoin = 'round';
+                points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
                 ctx.stroke();
 
-                const [, month] = months[i].split('-');
-                ctx.fillStyle = 'rgba(255,255,255,0.5)';
-                ctx.font = '10px Inter';
-                ctx.textAlign = 'center';
-                ctx.fillText(monthNames[parseInt(month) - 1], p.x, H - 8);
-            });
+                // Fill Area
+                ctx.lineTo(points[points.length-1].x, padding.top + chartH);
+                ctx.lineTo(points[0].x, padding.top + chartH);
+                ctx.closePath();
+                const grad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+                grad.addColorStop(0, color + '22');
+                grad.addColorStop(1, color + '00');
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // Dots
+                points.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                    ctx.stroke();
+                });
+            }
+
+            drawLine(caixaMonthMap, '#10B981', 'Receita');
+            drawLine(costMonthMap, '#F5A623', 'Despesas');
         });
+    }
+
+    function openBalanceModal() {
+        _openModal('modalBalanceSelect');
+        // Pre-select current month/year
+        const now = new Date();
+        $('#balMonthValue').value = now.getMonth();
+        $('#balYearValueM').value = now.getFullYear();
+        $('#balYearValueA').value = now.getFullYear();
+    }
+
+    function printFinancialBalance(type) {
+        const year = (type === 'monthly' ? $('#balYearValueM').value : $('#balYearValueA').value);
+        const month = (type === 'monthly' ? parseInt($('#balMonthValue').value) : null);
+        
+        const unitName = state.currentUnit === 'bikeshop' ? 'Strada BikeShop' : 'Bike Café';
+        const months_br = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        const periodLabel = type === 'monthly' ? `${months_br[month]} / ${year}` : `Ano ${year}`;
+
+        // Filter Data
+        const periodCosts = state.costs.filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            if (type === 'monthly') return d.getMonth() === month && d.getFullYear() == year;
+            return d.getFullYear() == year;
+        });
+        const periodCaixa = (state.caixa || []).filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            if (type === 'monthly') return d.getMonth() === month && d.getFullYear() == year;
+            return d.getFullYear() == year;
+        });
+
+        const totalCosts = periodCosts.reduce((s, c) => s + c.value, 0);
+        const totalRevenue = periodCaixa.reduce((s, c) => s + (c.value + (c.diferenca || 0)), 0);
+        const profit = totalRevenue - totalCosts;
+
+        // Categories breakdown
+        const cats = {};
+        periodCosts.forEach(c => {
+            const cat = state.categories.find(cat => cat.id === c.categoryId);
+            const name = cat ? cat.name : 'Outros';
+            cats[name] = (cats[name] || 0) + c.value;
+        });
+        const sortedCats = Object.entries(cats).sort((a,b) => b[1] - a[1]);
+
+        const printWin = window.open('', '_blank');
+        printWin.document.write(`
+            <html>
+            <head>
+                <title>Balanço ${periodLabel} - ${unitName}</title>
+                <style>
+                    body { font-family: 'Inter', sans-serif; color: #1a1a1a; padding: 40px; margin: 0; background: #fff; }
+                    .report-header { border-bottom: 3px solid #1a1a1a; padding-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+                    .unit-title { font-size: 28px; font-weight: 900; letter-spacing: -1px; margin: 0; }
+                    .period-label { font-size: 18px; color: #666; }
+                    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 40px 0; }
+                    .summary-card { padding: 25px; border: 1px solid #eee; border-radius: 12px; }
+                    .card-label { font-size: 12px; color: #888; text-transform: uppercase; font-weight: 700; margin-bottom: 5px; }
+                    .card-value { font-size: 24px; font-weight: 800; }
+                    .section-title { font-size: 16px; font-weight: 700; border-left: 4px solid #F5A623; padding-left: 10px; margin: 30px 0 15px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                    th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; }
+                    th { font-size: 12px; font-weight: 700; color: #999; }
+                    .profit-badge { display: inline-block; padding: 10px 20px; border-radius: 8px; font-weight: 800; font-size: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="report-header">
+                    <div>
+                        <h1 class="unit-title">${unitName}</h1>
+                        <div class="period-label">Balanço Financeiro: ${periodLabel}</div>
+                    </div>
+                    <div style="text-align:right; font-size:11px; color:#999">Documento emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString()}</div>
+                </div>
+
+                <div class="summary-grid">
+                    <div class="summary-card">
+                        <div class="card-label">Receita Total</div>
+                        <div class="card-value" style="color:#10B981">${formatCurrency(totalRevenue)}</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="card-label">Despesas Totais</div>
+                        <div class="card-value" style="color:#F5A623">${formatCurrency(totalCosts)}</div>
+                    </div>
+                    <div class="summary-card" style="background:#f8f9fa">
+                        <div class="card-label">Resultado Líquido</div>
+                        <div class="card-value" style="color:${profit >= 0 ? '#10B981' : '#EF4444'}">${formatCurrency(profit)}</div>
+                    </div>
+                </div>
+
+                <div class="section-title">Distribuição de Custos por Categoria</div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:50%">Categoria</th>
+                            <th style="width:25%">Valor</th>
+                            <th style="width:25%">% do Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sortedCats.map(([name, val]) => `
+                            <tr>
+                                <td style="font-weight:600">${name}</td>
+                                <td>${formatCurrency(val)}</td>
+                                <td style="color:#888">${((val/totalCosts)*100).toFixed(1)}%</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                ${type === 'monthly' ? `
+                <div class="section-title">Resumo Operacional</div>
+                <div style="font-size:14px; line-height:1.6; color:#555">
+                    Durante o período de ${periodLabel}, foram registrados <strong>${periodCaixa.length}</strong> fechamentos de caixa e <strong>${periodCosts.length}</strong> lançamentos de custos. 
+                    A média diária de receita foi de <strong>${formatCurrency(totalRevenue / 30)}</strong>.
+                </div>
+                ` : ''}
+
+                <div style="margin-top:50px; border-top:1px solid #eee; padding-top:20px; text-align:center; font-size:12px; color:#aaa">
+                    Gestão Strada v4.0 - Relatório Interno Confidencial
+                </div>
+                <script>window.onload = () => { window.print(); window.close(); };</script>
+            </body>
+            </html>
+        `);
+        printWin.document.close();
+        GestaoStrada.closeModal('modalBalanceSelect');
     }
 
     // ==========================================
@@ -3607,6 +3742,7 @@
         deleteIngredient, deleteRecipe, switchCalcTab,
         deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
         deleteCaixa, openCaixaReport, printCaixaReport,
+        openBalanceModal, printFinancialBalance,
         // Estoque
         renderBikes, saveBike, openMoveStock, confirmMoveStock, deleteBike,
         handleEstoqueImport, openEstoqueImport: triggerEstoqueImport,

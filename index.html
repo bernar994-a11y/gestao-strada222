@@ -519,6 +519,69 @@
 
 
 
+    <div id="modalBalanceSelect" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>📊 Gerar Balanço Financeiro</h3>
+                <button class="modal-close" onclick="GestaoStrada.closeModal('modalBalanceSelect')">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <div class="form-group">
+                    <label>Tipo de Relatório</label>
+                    <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                        <button id="btnBalMonth" class="btn-secondary" style="flex:1; background:rgba(255,255,255,0.05);" onclick="document.querySelectorAll('.bal-type').forEach(el=>el.style.display='none'); document.getElementById('balMonthSelect').style.display='block'; this.parentElement.querySelectorAll('button').forEach(b=>b.style.borderColor='transparent'); this.style.borderColor='var(--primary)';">Mensal</button>
+                        <button id="btnBalYear" class="btn-secondary" style="flex:1; background:rgba(255,255,255,0.05);" onclick="document.querySelectorAll('.bal-type').forEach(el=>el.style.display='none'); document.getElementById('balYearSelect').style.display='block'; this.parentElement.querySelectorAll('button').forEach(b=>b.style.borderColor='transparent'); this.style.borderColor='var(--primary)';">Anual</button>
+                    </div>
+                </div>
+
+                <!-- Mensal -->
+                <div id="balMonthSelect" class="bal-type" style="margin-top:1.5rem;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Mês</label>
+                            <select id="balMonthValue" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1rem;">
+                                <option value="0">Janeiro</option>
+                                <option value="1">Fevereiro</option>
+                                <option value="2">Março</option>
+                                <option value="3">Abril</option>
+                                <option value="4">Maio</option>
+                                <option value="5">Junho</option>
+                                <option value="6">Julho</option>
+                                <option value="7">Agosto</option>
+                                <option value="8">Setembro</option>
+                                <option value="9">Outubro</option>
+                                <option value="10">Novembro</option>
+                                <option value="11">Dezembro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ano</label>
+                            <select id="balYearValueM" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1rem;">
+                                <option value="2024">2024</option>
+                                <option value="2025">2025</option>
+                                <option value="2026">2026</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn-primary" style="width:100%; margin-top:1.5rem;" onclick="GestaoStrada.printFinancialBalance('monthly')">Gerar Relatório Mensal</button>
+                </div>
+
+                <!-- Anual -->
+                <div id="balYearSelect" class="bal-type" style="margin-top:1.5rem; display:none;">
+                    <div class="form-group">
+                        <label>Ano de Referência</label>
+                        <select id="balYearValueA" style="height:48px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); color:white; border-radius:12px; width:100%; padding:0 1rem;">
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" style="width:100%; margin-top:1.5rem;" onclick="GestaoStrada.printFinancialBalance('annual')">Gerar Relatório Anual</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Review Import -->
                 <section class="panel" id="panelExport">
                     <div class="panel-header">
@@ -1048,11 +1111,28 @@
 
                 <!-- Panel 9: Evolução de Despesas -->
                 <section class="panel" id="panelEvolution" data-panel="9">
-                    <div class="panel-header">
-                        <h2>Evolução de Despesas</h2>
-                        <p class="panel-subtitle">Acompanhe a evolução dos seus custos mês a mês</p>
+                    <div class="panel-header" style="flex-direction:row; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <h2>Evolução Financeira</h2>
+                            <p class="panel-subtitle">Acompanhe a evolução de despesas e caixa</p>
+                        </div>
+                        <button class="btn-primary" onclick="GestaoStrada.openBalanceModal()" style="padding: 0.6rem 1.2rem; font-size:0.85rem">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+                            <span>Gerar Balanço</span>
+                        </button>
                     </div>
                     <div class="panel-content">
+                        <!-- Chart Legend -->
+                        <div style="display:flex; gap:1.5rem; justify-content:center; margin-bottom:1.5rem; font-size:0.8rem; font-weight:600;">
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <div style="width:12px; height:12px; background:#F5A623; border-radius:3px;"></div>
+                                <span style="color:var(--text-muted)">Despesas</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <div style="width:12px; height:12px; background:#10B981; border-radius:3px;"></div>
+                                <span style="color:var(--text-muted)">Receitas (Caixa)</span>
+                            </div>
+                        </div>
                         <div id="evolutionContent"></div>
                     </div>
                 </section>
