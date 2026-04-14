@@ -3434,6 +3434,170 @@
         });
     }
 
+    function openCaixaReport() {
+        const body = $('#caixaReportBody');
+        const footer = $('#caixaReportFooter');
+        if (!body || !footer) return;
+
+        const now = new Date();
+        const entries = state.caixa.filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            return c.unit_id === state.currentUnit && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).sort((a, b) => b.date.localeCompare(a.date));
+
+        if (entries.length === 0) {
+            body.innerHTML = '<tr><td colspan="6" style="padding:2rem; text-align:center;">Nenhum lançamento encontrado para este mês.</td></tr>';
+            footer.innerHTML = '';
+        } else {
+            let totalBruto = 0;
+            let totalDif = 0;
+            let totalLiquido = 0;
+
+            body.innerHTML = entries.map(c => {
+                const liquido = c.value + (c.diferenca || 0);
+                totalBruto += c.value;
+                totalDif += (c.diferenca || 0);
+                totalLiquido += liquido;
+
+                return `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                        <td style="padding: 0.75rem; font-weight:600;">${formatDate_PT(c.date)}</td>
+                        <td style="padding: 0.75rem; text-transform: capitalize;">${c.turno}</td>
+                        <td style="padding: 0.75rem;">${formatCurrency(c.value)}</td>
+                        <td style="padding: 0.75rem; color:${c.diferenca > 0 ? '#10B981' : c.diferenca < 0 ? '#EF4444' : 'inherit'}">
+                            ${c.diferenca !== 0 ? formatCurrency(c.diferenca) : '—'}
+                        </td>
+                        <td style="padding: 0.75rem; font-weight:700; color:#10B981;">${formatCurrency(liquido)}</td>
+                        <td style="padding: 0.75rem; font-size:0.75rem; color:var(--text-muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(c.obs || '')}">
+                            ${esc(c.obs || '—')}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            footer.innerHTML = `
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:1.5rem; text-align:center;">
+                    <div>
+                        <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Total Bruto</div>
+                        <div style="font-size:1.2rem; font-weight:800; color:var(--text-primary);">${formatCurrency(totalBruto)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Quebra/Diferença</div>
+                        <div style="font-size:1.2rem; font-weight:800; color:${totalDif >= 0 ? '#10B981' : '#EF4444'};">${formatCurrency(totalDif)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase;">Total Líquido (Mês)</div>
+                        <div style="font-size:1.2rem; font-weight:800; color:#10B981;">${formatCurrency(totalLiquido)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        _openModal('modalCaixaReport');
+    }
+
+    function printCaixaReport() {
+        const now = new Date();
+        const monthName = new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(now);
+        const unitName = state.currentUnit === 'bikeshop' ? 'Strada BikeShop' : 'Bike Café';
+        
+        const entries = state.caixa.filter(c => {
+            const d = new Date(c.date + 'T12:00:00');
+            return c.unit_id === state.currentUnit && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        }).sort((a, b) => a.date.localeCompare(b.date));
+
+        if (entries.length === 0) {
+            showToast('⚠ Nada para imprimir neste mês');
+            return;
+        }
+
+        let totalBruto = 0;
+        let totalDif = 0;
+        let totalLiquido = 0;
+
+        const tableBody = entries.map(c => {
+            const liquido = c.value + (c.diferenca || 0);
+            totalBruto += c.value;
+            totalDif += (c.diferenca || 0);
+            totalLiquido += liquido;
+            
+            return `
+                <tr>
+                    <td>${formatDate_PT(c.date)}</td>
+                    <td style="text-transform: capitalize;">${c.turno}</td>
+                    <td>${formatCurrency(c.value)}</td>
+                    <td style="color:${c.diferenca < 0 ? 'red' : 'green'}">${formatCurrency(c.diferenca || 0)}</td>
+                    <td style="font-weight:bold;">${formatCurrency(liquido)}</td>
+                    <td style="font-size:0.8em">${esc(c.obs || '')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Relatório de Caixa - ${unitName}</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 40px; color: #333; }
+                        .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+                        h1 { margin: 0; font-size: 24px; }
+                        .unit { font-weight: bold; font-size: 18px; color: #666; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                        th { background: #f4f4f4; }
+                        .footer { margin-top: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px; }
+                        .footer-grid { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+                        .total-label { font-size: 12px; color: #666; text-transform: uppercase; }
+                        .total-val { font-size: 20px; font-weight: bold; margin-top: 5px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div>
+                            <h1>Relatório de Caixa</h1>
+                            <div class="unit">${unitName} — ${monthName.toUpperCase()} / ${now.getFullYear()}</div>
+                        </div>
+                        <div style="text-align:right; font-size:12px">Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Turno</th>
+                                <th>Valor Bruto</th>
+                                <th>Diferença</th>
+                                <th>Valor Líquido</th>
+                                <th>Observações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableBody}
+                        </tbody>
+                    </table>
+                    <div class="footer">
+                        <div class="footer-grid">
+                            <div>
+                                <div class="total-label">Total Bruto</div>
+                                <div class="total-val">${formatCurrency(totalBruto)}</div>
+                            </div>
+                            <div>
+                                <div class="total-label">Quebra/Dif. Acumulada</div>
+                                <div class="total-val" style="color:${totalDif < 0 ? 'red' : 'green'}">${formatCurrency(totalDif)}</div>
+                            </div>
+                            <div>
+                                <div class="total-label">Total Líquido</div>
+                                <div class="total-val" style="color:green">${formatCurrency(totalLiquido)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>window.onload = () => { window.print(); window.close(); };</script>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+    }
+
     // ==========================================
     // Public API
     // ==========================================
@@ -3442,7 +3606,7 @@
         deleteCost, deleteCategory, deleteContact, deleteEmployee,
         deleteIngredient, deleteRecipe, switchCalcTab,
         deleteCarne, toggleParcelaPaid, toggleCarne, toggleCostPaid,
-        deleteCaixa,
+        deleteCaixa, openCaixaReport, printCaixaReport,
         // Estoque
         renderBikes, saveBike, openMoveStock, confirmMoveStock, deleteBike,
         handleEstoqueImport, openEstoqueImport: triggerEstoqueImport,

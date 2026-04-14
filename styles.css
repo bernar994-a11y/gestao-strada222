@@ -1395,7 +1395,8 @@ textarea {
 /* Standalone Modals (Estoque, etc.) — modals that are NOT inside .modal-overlay */
 #modalAddBike,
 #modalMoveStock,
-#modalImportReview {
+#modalImportReview,
+#modalCaixaReport {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.6);
