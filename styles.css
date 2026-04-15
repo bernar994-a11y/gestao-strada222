@@ -555,7 +555,8 @@ body::before {
 
 .panel-header {
     padding: 2rem 2rem 1rem;
-    max-width: 900px;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 .panel-header h2 {
@@ -576,7 +577,8 @@ body::before {
 
 .panel-content {
     padding: 1rem 2rem 3rem;
-    max-width: 900px;
+    max-width: 1400px;
+    margin: 0 auto;
 }
 
 /* ========================================

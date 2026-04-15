@@ -2994,7 +2994,7 @@
             <div class="evo-summary-card"><span class="evo-summary-label">Média Lucro</span><span class="evo-summary-value">${formatCurrency(totalProfit / (months.length || 1))}</span></div>
         </div>`;
 
-        let chartHtml = `<div class="evo-canvas-wrapper" style="margin-top:1rem"><canvas id="evoCanvas" width="700" height="250"></canvas></div>`;
+        let chartHtml = `<div class="evo-canvas-wrapper" style="margin-top:1rem; width:100%"><canvas id="evoCanvas" style="width:100%" height="250"></canvas></div>`;
 
         let barsHtml = '<div class="evolution-chart" style="margin-top:2rem">';
         months.forEach((m, i) => {
@@ -3032,6 +3032,7 @@
         requestAnimationFrame(() => {
             const canvas = document.getElementById('evoCanvas');
             if (!canvas || months.length < 2) return;
+            canvas.width = canvas.parentElement.clientWidth;
             const ctx = canvas.getContext('2d');
             const W = canvas.width;
             const H = canvas.height;
